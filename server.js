@@ -12,10 +12,8 @@ const config = {
 const client = new line.Client(config);
 const app = express();
 
-// เสิร์ฟหน้าเว็บ (public/index.html) จากเซิร์ฟเวอร์เดียวกัน — ไม่ต้องมีเว็บแยก
 app.use(express.static(path.join(__dirname, 'public')));
 
-// อนุญาตให้หน้าเว็บ (คนละโดเมนกับเซิร์ฟเวอร์นี้) เรียก API ได้
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Content-Type, x-admin-passcode');
@@ -193,6 +191,7 @@ app.post('/api/upload-slip', express.json({ limit: '8mb' }), async (req, res) =>
 
     const slipUrl = `https://${req.get('host')}/uploads/${filename}`;
     order.slipImage = slipUrl;
+    order.status = 'กำลังทำ';
     writeOrders(orders);
 
     if (ADMIN_USER_ID) {
@@ -203,9 +202,34 @@ app.post('/api/upload-slip', express.json({ limit: '8mb' }), async (req, res) =>
       });
       await client.pushMessage(ADMIN_USER_ID, {
         type: 'text',
-        text: `สลิปโอนเงินออเดอร์ ${code} ครับ ↑`,
+        text: `สลิปโอนเงินออเดอร์ ${code} ครับ ↑\nระบบอัปเดตสถานะเป็น "กำลังทำ" ให้อัตโนมัติแล้ว`,
       });
     }
+
+    if (order.userId) {
+      await client.pushMessage(order.userId, {
+        type: 'text',
+        text: `ได้รับสลิปโอนเงินแล้วครับ ✅\nออเดอร์ ${code} อัปเดตสถานะเป็น "กำลังทำ"`,
+      });
+    }
+
+    setTimeout(async () => {
+      try {
+        const latestOrders = readOrders();
+        const latestOrder = latestOrders.find((o) => o.code === code);
+        if (!latestOrder || latestOrder.status !== 'กำลังทำ') return;
+        latestOrder.status = 'เสร็จแล้ว';
+        writeOrders(latestOrders);
+        if (latestOrder.userId) {
+          await client.pushMessage(latestOrder.userId, {
+            type: 'text',
+            text: `ออเดอร์ ${code} ของคุณเสร็จแล้วครับ พร้อมรับ/จัดส่งแล้ว 🎉`,
+          });
+        }
+      } catch (e) {
+        console.error('auto-complete error:', e);
+      }
+    }, 10 * 60 * 1000);
 
     res.json({ ok: true, slipUrl });
   } catch (err) {
