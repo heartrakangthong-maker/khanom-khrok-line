@@ -34,7 +34,7 @@ const DEFAULT_CATALOG = [
     id: 'khrok',
     name: 'ขนมครกสิงคโปร์',
     tagline: 'หอมกะทิ กรอบนอกนุ่มใน สูตรสิงคโปร์',
-    image: '',
+    image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/pandan.jfif',
     emoji: '🥥',
     variants: [
       { id: 'khrok-8', label: '8 ชิ้น', price: 30 },
@@ -46,7 +46,7 @@ const DEFAULT_CATALOG = [
     id: 'babin',
     name: 'ขนมบ้าบิ่นมะพร้าวน้ำหอม',
     tagline: 'เนื้อนุ่ม หอมมะพร้าวอ่อนแท้ทั้งกล่อง',
-    image: '',
+    image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/babin.jfif',
     emoji: '🍥',
     variants: [{ id: 'babin-1', label: '1 กล่อง', price: 50 }],
   },
@@ -54,7 +54,7 @@ const DEFAULT_CATALOG = [
     id: 'combo',
     name: 'รวมขนมครกสิงคโปร์ + บ้าบิ่น',
     tagline: 'อยากกินสองอย่างในกล่องเดียว จบในออเดอร์เดียว',
-    image: '',
+    image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/mixbabin.jfif',
     emoji: '🎁',
     variants: [
       { id: 'combo-s', label: 'กล่องเล็ก', price: 40 },
