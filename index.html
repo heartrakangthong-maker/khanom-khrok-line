@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>ขนมครกสิงคโปร์ — สั่งผ่าน LINE</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{
+    --teal:#146B6E; --coral:#E85D4C; --mustard:#E3A335;
+    --cream:#FBF3E7; --cream-deep:#F3E6D3; --plum:#3A2233; --leaf:#527A54;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);font-family:'Sarabun',sans-serif;color:var(--plum);}
+  .mitr{font-family:'Mitr',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;}
+  input,textarea{font-family:inherit;}
+  .card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 8px 20px -12px rgba(58,34,51,.25);}
+  .pill{padding:6px 12px;border-radius:999px;font-size:13px;font-weight:500;border:1px solid #D9C9AE;background:#fff;color:var(--plum);}
+  .pill.active{background:var(--coral);border-color:var(--coral);color:#fff;}
+  .btn-primary{background:var(--coral);color:#fff;border-radius:999px;padding:12px 20px;font-weight:600;}
+  .btn-primary:disabled{opacity:.4;}
+  .btn-teal{background:var(--teal);color:#fff;border-radius:999px;padding:10px 16px;font-weight:600;}
+  .stepper{display:flex;align-items:center;border:1px solid #D9C9AE;border-radius:999px;overflow:hidden;}
+  .stepper button{width:32px;height:32px;color:var(--teal);}
+  .header{background:var(--teal);padding:20px 16px 26px;color:#fff;}
+  .thumb{width:64px;height:64px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px;background:linear-gradient(135deg,#E3A33533,#E85D4C22);border:2px dashed var(--cream-deep);object-fit:cover;}
+  .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;}
+  .drawer{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;max-height:85vh;display:flex;flex-direction:column;z-index:31;}
+  input[type=text],input[type=password],input[type=number],textarea{width:100%;padding:8px 12px;border-radius:12px;border:1px solid #D9C9AE;font-size:14px;}
+  .sticky-bottom{position:fixed;left:0;right:0;bottom:0;padding:8px 16px 20px;background:linear-gradient(to top, var(--cream), var(--cream) 60%, transparent);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+
+/* ====== ตั้งค่าก่อนใช้งานจริง ====== */
+const API_BASE = ""; // เว้นว่างไว้ได้เลย เพราะหน้าเว็บนี้กับเซิร์ฟเวอร์อยู่โดเมนเดียวกัน (Glitch)
+const LIFF_ID = "YOUR_LIFF_ID"; // จาก LINE Developers Console > LIFF — ต้องตั้งหลังได้ URL ของ Glitch แล้ว
+
+function baht(n){ return Number(n).toLocaleString("th-TH"); }
+
+function useLiffProfile(){
+  const [profile, setProfile] = useState(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!window.liff || LIFF_ID === "YOUR_LIFF_ID") { setReady(true); return; }
+    liff.init({ liffId: LIFF_ID }).then(async () => {
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+      const p = await liff.getProfile();
+      setProfile(p);
+      setReady(true);
+    }).catch(() => setReady(true));
+  }, []);
+  return { profile, ready };
+}
+
+function Pill({active,onClick,children}){
+  return <button className={"pill" + (active?" active":"")} onClick={onClick}>{children}</button>;
+}
+function Stepper({value,onChange,min=0}){
+  return (
+    <div className="stepper">
+      <button onClick={()=>onChange(Math.max(min,value-1))}>−</button>
+      <span className="mono" style={{width:28,textAlign:"center",fontWeight:600}}>{value}</span>
+      <button onClick={()=>onChange(value+1)}>+</button>
+    </div>
+  );
+}
+function Thumb({product}){
+  if (product.image) return <img className="thumb" src={product.image} alt={product.name}/>;
+  return <div className="thumb">{product.emoji || "🍽️"}</div>;
+}
+
+function ProductCard({product,onAdd}){
+  const [variantId,setVariantId] = useState(product.variants[0]?.id);
+  const [qty,setQty] = useState(1);
+  const [flash,setFlash] = useState(false);
+  const variant = product.variants.find(v=>v.id===variantId) || product.variants[0];
+  const add = () => {
+    onAdd(product, variant, qty);
+    setQty(1); setFlash(true); setTimeout(()=>setFlash(false),500);
+  };
+  return (
+    <div className="card" style={{marginBottom:12}}>
+      <div style={{display:"flex",gap:12}}>
+        <Thumb product={product}/>
+        <div style={{minWidth:0,flex:1}}>
+          <h3 className="mitr" style={{margin:0,fontSize:15,fontWeight:600}}>{product.name}</h3>
+          <p style={{margin:"2px 0 0",fontSize:12,color:"#7A6A5C"}}>{product.tagline}</p>
+        </div>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:12}}>
+        {product.variants.map(v=>(
+          <Pill key={v.id} active={v.id===variantId} onClick={()=>setVariantId(v.id)}>
+            {v.label} · {baht(v.price)}฿
+          </Pill>
+        ))}
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
+        <Stepper value={qty} onChange={setQty} min={1}/>
+        <button className="btn-teal" style={{background:flash?"#527A54":"#146B6E"}} onClick={add}>
+          {flash ? "เพิ่มแล้ว ✓" : `ใส่ตะกร้า ${baht(variant.price*qty)}฿`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CartDrawer({open,onClose,cart,onQtyChange,onRemove,total,onCheckout}){
+  if (!open) return null;
+  return (
+    <React.Fragment>
+      <div className="drawer-overlay" onClick={onClose}/>
+      <div className="drawer">
+        <div style={{display:"flex",justifyContent:"space-between",padding:"16px 20px 8px"}}>
+          <h2 className="mitr" style={{margin:0,fontSize:16}}>ตะกร้าของคุณ</h2>
+          <button onClick={onClose}>✕</button>
+        </div>
+        <div style={{overflowY:"auto",padding:"0 20px",flex:1}}>
+          {cart.length===0 ? (
+            <p style={{textAlign:"center",color:"#9C8A7A",padding:"30px 0"}}>ยังไม่มีสินค้าในตะกร้า</p>
+          ) : cart.map(item=>(
+            <div key={item.key} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #F3E6D3"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:0,fontSize:14,fontWeight:500}}>{item.productName} — {item.variantLabel}</p>
+                <p className="mono" style={{margin:"2px 0 0",fontSize:12,color:"var(--coral)"}}>{baht(item.price)}฿ / กล่อง</p>
+              </div>
+              <Stepper value={item.qty} onChange={(n)=>onQtyChange(item.key,n)} min={0}/>
+              <button onClick={()=>onRemove(item.key)}>🗑</button>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"12px 20px 24px",borderTop:"1px solid #F3E6D3"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
+            <span>ยอดรวม</span>
+            <span className="mono" style={{fontWeight:700,fontSize:18}}>{baht(total)}฿</span>
+          </div>
+          <button className="btn-primary" style={{width:"100%"}} disabled={cart.length===0} onClick={onCheckout}>
+            ไปหน้ายืนยันออเดอร์
+          </button>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+}
+
+function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
+  const [name,setName] = useState(profile?.displayName || "");
+  const [fulfil,setFulfil] = useState("รับเอง");
+  const [note,setNote] = useState("");
+  const canSubmit = name.trim().length>0 && !submitting;
+  return (
+    <div style={{padding:"12px 16px 120px"}}>
+      <button onClick={onBack} style={{color:"var(--teal)",fontSize:14,marginBottom:12}}>‹ กลับไปแก้ตะกร้า</button>
+      <h2 className="mitr" style={{fontSize:18,marginTop:0}}>ยืนยันออเดอร์</h2>
+      <div className="card" style={{marginBottom:12}}>
+        {cart.map(item=>(
+          <div key={item.key} style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"6px 0",borderBottom:"1px solid #F3E6D3"}}>
+            <span>{item.productName} ({item.variantLabel}) × {item.qty}</span>
+            <span className="mono">{baht(item.price*item.qty)}฿</span>
+          </div>
+        ))}
+        <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,paddingTop:8}}>
+          <span>รวมทั้งหมด</span><span className="mono" style={{color:"var(--coral)"}}>{baht(total)}฿</span>
+        </div>
+      </div>
+      <div className="card">
+        <label style={{fontSize:12,color:"#7A6A5C"}}>ชื่อผู้สั่ง *</label>
+        <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="เช่น คุณส้ม" style={{marginTop:4,marginBottom:12}}/>
+        <label style={{fontSize:12,color:"#7A6A5C",display:"block",marginBottom:6}}>รับสินค้าแบบไหน</label>
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          {["รับเอง","จัดส่ง"].map(o=><Pill key={o} active={fulfil===o} onClick={()=>setFulfil(o)}>{o}</Pill>)}
+        </div>
+        <label style={{fontSize:12,color:"#7A6A5C"}}>{fulfil==="จัดส่ง" ? "ที่อยู่จัดส่ง" : "หมายเหตุ (ถ้ามี)"}</label>
+        <textarea rows="2" value={note} onChange={e=>setNote(e.target.value)} style={{marginTop:4}}/>
+      </div>
+      <div className="sticky-bottom">
+        <button className="btn-primary" style={{width:"100%"}} disabled={!canSubmit} onClick={()=>onConfirm({name,fulfil,note})}>
+          {submitting ? "กำลังส่งออเดอร์..." : `ยืนยันสั่งซื้อ · ${baht(total)}฿`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmScreen({order,onNewOrder}){
+  return (
+    <div style={{padding:"40px 20px",textAlign:"center"}}>
+      <div style={{width:64,height:64,borderRadius:"50%",background:"var(--leaf)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 16px"}}>✓</div>
+      <h2 className="mitr" style={{fontSize:18}}>รับออเดอร์แล้ว!</h2>
+      <p style={{fontSize:14,color:"#7A6A5C"}}>เลขที่ออเดอร์ของคุณคือ</p>
+      <p className="mono" style={{fontSize:20,fontWeight:700,color:"var(--coral)",background:"var(--cream-deep)",display:"inline-block",padding:"6px 16px",borderRadius:999}}>{order.code}</p>
+      <p style={{fontSize:13,color:"#7A6A5C",marginTop:16}}>แอดมินได้รับแจ้งเตือนในแชท LINE แล้ว รอการยืนยันได้เลยครับ</p>
+      <button className="btn-teal" style={{marginTop:20}} onClick={onNewOrder}>สั่งเพิ่มอีกออเดอร์</button>
+    </div>
+  );
+}
+
+function AdminPanel({onClose}){
+  const [passcode,setPasscode] = useState("");
+  const [unlocked,setUnlocked] = useState(false);
+  const [catalog,setCatalog] = useState([]);
+  const [orders,setOrders] = useState([]);
+  const [tab,setTab] = useState("menu");
+  const [error,setError] = useState("");
+
+  const unlock = async () => {
+    const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode } });
+    if (!res.ok) { setError("รหัสผ่านไม่ถูกต้อง"); return; }
+    setOrders(await res.json());
+    const c = await fetch(`${API_BASE}/api/catalog`).then(r=>r.json());
+    setCatalog(c);
+    setUnlocked(true);
+  };
+
+  const saveCatalog = async (next) => {
+    setCatalog(next);
+    await fetch(`${API_BASE}/api/catalog`, {
+      method:"PUT",
+      headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
+      body: JSON.stringify(next),
+    });
+  };
+  const updateProduct = (pid, patch) => saveCatalog(catalog.map(p=>p.id===pid?{...p,...patch}:p));
+  const updateVariant = (pid, vid, patch) => saveCatalog(catalog.map(p=> p.id!==pid ? p : {...p, variants:p.variants.map(v=>v.id===vid?{...v,...patch}:v)}));
+
+  const setOrderStatus = async (code, status) => {
+    setOrders(orders.map(o=>o.code===code?{...o,status}:o));
+    await fetch(`${API_BASE}/api/orders/${code}`, {
+      method:"PUT",
+      headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
+      body: JSON.stringify({status}),
+    });
+  };
+
+  if (!unlocked) {
+    return (
+      <div className="drawer-overlay" style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div className="card" style={{width:280}}>
+          <h3 className="mitr" style={{marginTop:0}}>รหัสจัดการร้าน</h3>
+          <input type="password" value={passcode} onChange={e=>setPasscode(e.target.value)} onKeyDown={e=>e.key==="Enter"&&unlock()} placeholder="กรอกรหัสผ่าน" style={{marginBottom:8,borderColor:error?"var(--coral)":"#D9C9AE"}}/>
+          {error && <p style={{color:"var(--coral)",fontSize:12,margin:"0 0 8px"}}>{error}</p>}
+          <div style={{display:"flex",gap:8}}>
+            <button className="pill" style={{flex:1}} onClick={onClose}>ยกเลิก</button>
+            <button className="btn-teal" style={{flex:1}} onClick={unlock}>เข้าสู่ระบบ</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#fff",zIndex:40,display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 16px",borderBottom:"1px solid #F3E6D3"}}>
+        <h2 className="mitr" style={{margin:0,fontSize:16}}>จัดการร้าน</h2>
+        <button onClick={onClose}>✕</button>
+      </div>
+      <div style={{display:"flex",gap:8,padding:"12px 16px"}}>
+        <Pill active={tab==="menu"} onClick={()=>setTab("menu")}>แก้ไขเมนู/ราคา/รูป</Pill>
+        <Pill active={tab==="orders"} onClick={()=>setTab("orders")}>ออเดอร์ ({orders.length})</Pill>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"0 16px 32px"}}>
+        {tab==="menu" && catalog.map(p=>(
+          <div key={p.id} className="card" style={{marginBottom:12}}>
+            <div style={{display:"flex",gap:10,marginBottom:10}}>
+              <Thumb product={p}/>
+              <div style={{flex:1}}>
+                <input type="text" value={p.name} onChange={e=>updateProduct(p.id,{name:e.target.value})} style={{marginBottom:6,fontWeight:600}}/>
+                <input type="text" value={p.image} onChange={e=>updateProduct(p.id,{image:e.target.value})} placeholder="ลิงก์รูปภาพ (URL)" style={{fontSize:12}}/>
+              </div>
+            </div>
+            {p.variants.map(v=>(
+              <div key={v.id} style={{display:"flex",gap:8,marginBottom:6}}>
+                <input type="text" value={v.label} onChange={e=>updateVariant(p.id,v.id,{label:e.target.value})} style={{flex:1}}/>
+                <input type="number" value={v.price} onChange={e=>updateVariant(p.id,v.id,{price:Number(e.target.value)||0})} style={{width:80,textAlign:"right"}}/>
+              </div>
+            ))}
+          </div>
+        ))}
+        {tab==="orders" && (orders.length===0 ? <p style={{textAlign:"center",color:"#9C8A7A",padding:"30px 0"}}>ยังไม่มีออเดอร์</p> :
+          [...orders].reverse().map(o=>(
+            <div key={o.code} className="card" style={{marginBottom:12}}>
+              <p className="mono" style={{color:"var(--coral)",fontWeight:700,margin:0}}>{o.code}</p>
+              <p style={{margin:"2px 0",fontSize:14}}>{o.name}</p>
+              <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>{o.fulfil}{o.note ? " · "+o.note : ""}</p>
+              <div style={{fontSize:13,margin:"8px 0"}}>
+                {o.items.map((it,i)=><div key={i}>{it.productName} ({it.variantLabel}) × {it.qty}</div>)}
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span className="mono" style={{fontWeight:700}}>{baht(o.total)}฿</span>
+                <div style={{display:"flex",gap:6}}>
+                  {["ใหม่","กำลังทำ","เสร็จแล้ว"].map(s=>(
+                    <Pill key={s} active={o.status===s} onClick={()=>setOrderStatus(o.code,s)}>{s}</Pill>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const { profile, ready } = useLiffProfile();
+  const [catalog,setCatalog] = useState([]);
+  const [cart,setCart] = useState([]);
+  const [cartOpen,setCartOpen] = useState(false);
+  const [screen,setScreen] = useState("shop");
+  const [lastOrder,setLastOrder] = useState(null);
+  const [submitting,setSubmitting] = useState(false);
+  const [adminOpen,setAdminOpen] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/catalog`).then(r=>r.json()).then(setCatalog).catch(()=>{});
+  }, []);
+
+  const addToCart = useCallback((product,variant,qty) => {
+    setCart(prev => {
+      const key = `${product.id}-${variant.id}`;
+      const existing = prev.find(it=>it.key===key);
+      if (existing) return prev.map(it=>it.key===key?{...it,qty:it.qty+qty}:it);
+      return [...prev,{key,productId:product.id,productName:product.name,variantLabel:variant.label,price:variant.price,qty}];
+    });
+  }, []);
+  const changeQty = (key,n) => setCart(prev => n<=0 ? prev.filter(it=>it.key!==key) : prev.map(it=>it.key===key?{...it,qty:n}:it));
+  const removeItem = (key) => setCart(prev=>prev.filter(it=>it.key!==key));
+  const total = cart.reduce((s,it)=>s+it.price*it.qty,0);
+  const itemCount = cart.reduce((s,it)=>s+it.qty,0);
+
+  const confirmOrder = async (info) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/order`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          userId: profile?.userId || "guest-" + Date.now(),
+          lineDisplayName: profile?.displayName,
+          items: cart, total, ...info,
+        }),
+      });
+      const data = await res.json();
+      setLastOrder({ code: data.code, ...info, items: cart, total });
+      setCart([]);
+      setScreen("confirm");
+    } catch (e) {
+      alert("ส่งออเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!ready || catalog.length===0) {
+    return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>กำลังโหลดร้าน...</div>;
+  }
+
+  return (
+    <div style={{minHeight:"100vh"}}>
+      <div className="header">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <p style={{margin:0,fontSize:11,letterSpacing:1,textTransform:"uppercase",color:"var(--mustard)"}}>สั่งผ่าน LINE OA</p>
+            <h1 className="mitr" style={{margin:"2px 0 0",fontSize:24}}>ขนมครกสิงคโปร์</h1>
+            <p style={{margin:"4px 0 0",fontSize:12,opacity:.85}}>สดใหม่ทุกออเดอร์ · เลือกเมนูแล้วยืนยันได้เลย</p>
+          </div>
+          <button onClick={()=>setAdminOpen(true)} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.15)",color:"#fff"}}>⚙</button>
+        </div>
+      </div>
+
+      {screen==="shop" && (
+        <div style={{padding:"12px 16px 110px"}}>
+          {catalog.map(p=><ProductCard key={p.id} product={p} onAdd={addToCart}/>)}
+        </div>
+      )}
+      {screen==="checkout" && (
+        <CheckoutScreen cart={cart} total={total} profile={profile} submitting={submitting}
+          onBack={()=>setScreen("shop")} onConfirm={confirmOrder}/>
+      )}
+      {screen==="confirm" && lastOrder && (
+        <ConfirmScreen order={lastOrder} onNewOrder={()=>{setLastOrder(null);setScreen("shop");}}/>
+      )}
+
+      {screen==="shop" && itemCount>0 && (
+        <div className="sticky-bottom">
+          <button className="btn-primary" style={{width:"100%",display:"flex",justifyContent:"space-between"}} onClick={()=>setCartOpen(true)}>
+            <span>🛍 {itemCount} รายการ</span>
+            <span className="mono">{baht(total)}฿</span>
+          </button>
+        </div>
+      )}
+
+      <CartDrawer open={cartOpen} onClose={()=>setCartOpen(false)} cart={cart}
+        onQtyChange={changeQty} onRemove={removeItem} total={total}
+        onCheckout={()=>{setCartOpen(false);setScreen("checkout");}}/>
+
+      {adminOpen && <AdminPanel onClose={()=>setAdminOpen(false)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
