@@ -42,7 +42,6 @@
 <script type="text/babel-source" id="app-source">
 const { useState, useEffect, useCallback } = React;
 
-/* ====== ตั้งค่าก่อนใช้งานจริง ====== */
 const API_BASE = "";
 const LIFF_ID = "2010953976-QdHdT43h";
 
@@ -193,6 +192,30 @@ function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
 }
 
 function ConfirmScreen({order,onNewOrder,settings}){
+  const [slipStatus,setSlipStatus] = useState("idle");
+  const fileInputRef = React.useRef(null);
+
+  const handleSlipUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSlipStatus("uploading");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/upload-slip`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ code: order.code, imageBase64: reader.result }),
+        });
+        if (!res.ok) throw new Error("upload failed");
+        setSlipStatus("done");
+      } catch (err) {
+        setSlipStatus("error");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div style={{padding:"40px 20px",textAlign:"center"}}>
       <div style={{width:64,height:64,borderRadius:"50%",background:"var(--leaf)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 16px"}}>✓</div>
@@ -206,6 +229,17 @@ function ConfirmScreen({order,onNewOrder,settings}){
           <img src={settings.qrImage} alt="QR ชำระเงิน" style={{width:200,height:200,objectFit:"contain",margin:"0 auto"}}/>
           <p style={{fontSize:14,fontWeight:600,marginTop:8}}>{settings.accountName}</p>
           <p className="mono" style={{fontSize:18,fontWeight:700,color:"var(--coral)",marginTop:4}}>ยอดโอน {baht(order.total)}฿</p>
+          <input type="file" accept="image/*" ref={fileInputRef} style={{display:"none"}} onChange={handleSlipUpload}/>
+          <div style={{marginTop:12}}>
+            {slipStatus==="done" ? (
+              <p style={{color:"var(--leaf)",fontWeight:600,fontSize:14}}>✓ แนบสลิปแล้ว ขอบคุณครับ</p>
+            ) : (
+              <button className="btn-teal" style={{width:"100%"}} disabled={slipStatus==="uploading"} onClick={()=>fileInputRef.current.click()}>
+                {slipStatus==="uploading" ? "กำลังอัปโหลด..." : "📎 แนบสลิปโอนเงิน"}
+              </button>
+            )}
+            {slipStatus==="error" && <p style={{color:"var(--coral)",fontSize:12,marginTop:6}}>แนบสลิปไม่สำเร็จ ลองใหม่อีกครั้ง</p>}
+          </div>
         </div>
       )}
       <button className="btn-teal" style={{marginTop:20}} onClick={onNewOrder}>สั่งเพิ่มอีกออเดอร์</button>
@@ -325,6 +359,12 @@ function AdminPanel({onClose}){
               <div style={{fontSize:13,margin:"8px 0"}}>
                 {o.items.map((it,i)=><div key={i}>{it.productName} ({it.variantLabel}) × {it.qty}</div>)}
               </div>
+              {o.slipImage && (
+                <div style={{margin:"8px 0"}}>
+                  <p style={{fontSize:12,color:"#7A6A5C",marginBottom:4}}>สลิปโอนเงิน</p>
+                  <img src={o.slipImage} alt="สลิป" style={{width:120,borderRadius:8,cursor:"pointer",border:"1px solid #F3E6D3"}} onClick={()=>window.open(o.slipImage,"_blank")}/>
+                </div>
+              )}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span className="mono" style={{fontWeight:700}}>{baht(o.total)}฿</span>
                 <div style={{display:"flex",gap:6}}>
