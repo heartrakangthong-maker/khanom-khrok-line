@@ -79,6 +79,20 @@ function readCatalog() {
 }
 function writeCatalog(catalog) {
   fs.writeFileSync(CATALOG_FILE, JSON.stringify(catalog, null, 2));
+}const SETTINGS_FILE = path.join(__dirname, 'settings.json');
+const DEFAULT_SETTINGS = {
+  qrImage: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/qr.jpg',
+  accountName: 'สุวัจนะ เกียรติพันธุ์สดใส · พร้อมเพย์ 095-812-9919',
+};
+function readSettings() {
+  if (!fs.existsSync(SETTINGS_FILE)) {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+    return DEFAULT_SETTINGS;
+  }
+  return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+}
+function writeSettings(settings) {
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
 }
 function requireAdmin(req, res, next) {
   if (req.headers['x-admin-passcode'] !== ADMIN_PASSCODE) {
@@ -152,6 +166,11 @@ app.put('/api/catalog', express.json(), requireAdmin, (req, res) => {
 /* -------------------------------------------------------------
    ออเดอร์ — สำหรับหน้าแดชบอร์ดแอดมิน (ต้องส่ง header x-admin-passcode)
 ------------------------------------------------------------- */
+app.get('/api/settings', (req, res) => res.json(readSettings()));
+app.put('/api/settings', express.json(), requireAdmin, (req, res) => {
+  writeSettings(req.body);
+  res.json({ ok: true });
+});
 app.get('/api/orders', requireAdmin, (req, res) => {
   res.json(readOrders());
 });
