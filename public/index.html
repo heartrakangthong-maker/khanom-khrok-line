@@ -39,9 +39,7 @@
 <body>
 <div id="root"></div>
 
-<script type="text/babel" data-presets="react">
-/** @jsx React.createElement */
-/** @jsxFrag React.Fragment */
+<script type="text/babel-source" id="app-source">
 const { useState, useEffect, useCallback } = React;
 
 /* ====== ตั้งค่าก่อนใช้งานจริง ====== */
@@ -413,5 +411,12 @@ function App(){
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
+  <script>
+     const __src = document.getElementById('app-source').textContent;
+     const __out = Babel.transform(__src, { presets: [["react", { runtime: "classic" }]] }).code;
+     const __s = document.createElement('script');
+     __s.textContent = __out;
+     document.body.appendChild(__s);
+   </script>
 </body>
 </html>
