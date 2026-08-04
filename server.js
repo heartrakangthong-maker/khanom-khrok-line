@@ -201,6 +201,7 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 });
 
 async function handleEvent(event) {
+console.log('EVENT SOURCE:', JSON.stringify(event.source));
   // แอดมินกดปุ่มในการ์ดแจ้งเตือนออเดอร์ เพื่อเปลี่ยนสถานะ
   if (event.type === 'postback') {
     const data = new URLSearchParams(event.postback.data);
