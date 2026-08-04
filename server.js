@@ -26,8 +26,10 @@ app.use((req, res, next) => {
 
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 const CATALOG_FILE = path.join(__dirname, 'catalog.json');
-const ADMIN_USER_ID = process.env.ADMIN_LINE_USER_ID; // ดูวิธีหา userId ใน README
+const ADMIN_USER_ID = process.env.ADMIN_LINE_USER_ID;
 const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || '1234';
+const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const DEFAULT_CATALOG = [
   {
@@ -79,7 +81,8 @@ function readCatalog() {
 }
 function writeCatalog(catalog) {
   fs.writeFileSync(CATALOG_FILE, JSON.stringify(catalog, null, 2));
-}const SETTINGS_FILE = path.join(__dirname, 'settings.json');
+}
+const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const DEFAULT_SETTINGS = {
   qrImage: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/qr.jpg',
   accountName: 'สุวัจนะ เกียรติพันธุ์สดใส · พร้อมเพย์ 095-812-9919',
@@ -109,11 +112,6 @@ function makeOrderCode() {
   return `SK${y}${m}${day}-${rand}`;
 }
 
-/* -------------------------------------------------------------
-   1) หน้าสั่งซื้อ (LIFF) เรียก endpoint นี้ตอนลูกค้ากด "ยืนยันสั่งซื้อ"
-      body: { userId, name, lineDisplayName, items, total, fulfil, note }
-      userId ได้จาก liff.getProfile() ฝั่งหน้าเว็บ — ต้องรันอยู่ใน LIFF เท่านั้น
-------------------------------------------------------------- */
 app.post('/api/order', express.json(), async (req, res) => {
   try {
     const { userId, name, lineDisplayName, items, total, fulfil, note } = req.body;
@@ -150,9 +148,6 @@ app.post('/api/order', express.json(), async (req, res) => {
   }
 });
 
-/* -------------------------------------------------------------
-   เมนู/ราคา — หน้าเว็บดึงมาแสดงตอนเปิดหน้า, แอดมินแก้ไขผ่าน /api/catalog (PUT)
-------------------------------------------------------------- */
 app.get('/api/catalog', (req, res) => {
   res.json(readCatalog());
 });
@@ -163,14 +158,12 @@ app.put('/api/catalog', express.json(), requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-/* -------------------------------------------------------------
-   ออเดอร์ — สำหรับหน้าแดชบอร์ดแอดมิน (ต้องส่ง header x-admin-passcode)
-------------------------------------------------------------- */
 app.get('/api/settings', (req, res) => res.json(readSettings()));
 app.put('/api/settings', express.json(), requireAdmin, (req, res) => {
   writeSettings(req.body);
   res.json({ ok: true });
 });
+
 app.get('/api/orders', requireAdmin, (req, res) => {
   res.json(readOrders());
 });
@@ -184,12 +177,43 @@ app.put('/api/orders/:code', express.json(), requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-/* -------------------------------------------------------------
-   2) LINE เรียก endpoint นี้ทุกครั้งที่มี event
-      (ข้อความจากลูกค้า, ปุ่ม postback ที่แอดมินกดเปลี่ยนสถานะ)
-      line.middleware ตรวจลายเซ็น X-Line-Signature ให้อัตโนมัติ
-      ต้องตั้งค่า Webhook URL ใน console เป็น .../webhook
-------------------------------------------------------------- */
+app.post('/api/upload-slip', express.json({ limit: '8mb' }), async (req, res) => {
+  try {
+    const { code, imageBase64 } = req.body;
+    if (!code || !imageBase64) return res.status(400).json({ error: 'missing data' });
+    const orders = readOrders();
+    const order = orders.find((o) => o.code === code);
+    if (!order) return res.status(404).json({ error: 'order not found' });
+
+    const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
+    const ext = matches ? matches[1] : 'jpg';
+    const data = matches ? matches[2] : imageBase64;
+    const filename = `slip-${code}-${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), Buffer.from(data, 'base64'));
+
+    const slipUrl = `https://${req.get('host')}/uploads/${filename}`;
+    order.slipImage = slipUrl;
+    writeOrders(orders);
+
+    if (ADMIN_USER_ID) {
+      await client.pushMessage(ADMIN_USER_ID, {
+        type: 'image',
+        originalContentUrl: slipUrl,
+        previewImageUrl: slipUrl,
+      });
+      await client.pushMessage(ADMIN_USER_ID, {
+        type: 'text',
+        text: `สลิปโอนเงินออเดอร์ ${code} ครับ ↑`,
+      });
+    }
+
+    res.json({ ok: true, slipUrl });
+  } catch (err) {
+    console.error('upload-slip error:', err);
+    res.status(500).json({ error: 'internal error' });
+  }
+});
+
 app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
     await Promise.all(req.body.events.map(handleEvent));
@@ -201,8 +225,6 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 });
 
 async function handleEvent(event) {
-
-  // แอดมินกดปุ่มในการ์ดแจ้งเตือนออเดอร์ เพื่อเปลี่ยนสถานะ
   if (event.type === 'postback') {
     const data = new URLSearchParams(event.postback.data);
     if (data.get('action') !== 'set_status') return;
@@ -230,7 +252,6 @@ async function handleEvent(event) {
     return;
   }
 
-  // ลูกค้าพิมพ์ข้อความมาในแชท OA เอง — ตอบลิงก์เข้า LIFF ให้สั่งของ
   if (event.type === 'message' && event.message.type === 'text') {
     const text = event.message.text.trim();
     if (text === 'เมนู' || text === 'สั่งของ' || text === 'order') {
