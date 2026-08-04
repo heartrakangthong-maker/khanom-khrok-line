@@ -43,8 +43,8 @@
 const { useState, useEffect, useCallback } = React;
 
 /* ====== ตั้งค่าก่อนใช้งานจริง ====== */
-const API_BASE = ""; // เว้นว่างไว้ได้เลย เพราะหน้าเว็บนี้กับเซิร์ฟเวอร์อยู่โดเมนเดียวกัน (Glitch)
-const LIFF_ID = "2010953976-QdHdT43h"; // จาก LINE Developers Console > LIFF — ต้องตั้งหลังได้ URL ของ Glitch แล้ว
+const API_BASE = "";
+const LIFF_ID = "2010953976-QdHdT43h";
 
 function baht(n){ return Number(n).toLocaleString("th-TH"); }
 
@@ -192,7 +192,7 @@ function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
   );
 }
 
-function ConfirmScreen({order,onNewOrder}){
+function ConfirmScreen({order,onNewOrder,settings}){
   return (
     <div style={{padding:"40px 20px",textAlign:"center"}}>
       <div style={{width:64,height:64,borderRadius:"50%",background:"var(--leaf)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 16px"}}>✓</div>
@@ -200,6 +200,14 @@ function ConfirmScreen({order,onNewOrder}){
       <p style={{fontSize:14,color:"#7A6A5C"}}>เลขที่ออเดอร์ของคุณคือ</p>
       <p className="mono" style={{fontSize:20,fontWeight:700,color:"var(--coral)",background:"var(--cream-deep)",display:"inline-block",padding:"6px 16px",borderRadius:999}}>{order.code}</p>
       <p style={{fontSize:13,color:"#7A6A5C",marginTop:16}}>แอดมินได้รับแจ้งเตือนในแชท LINE แล้ว รอการยืนยันได้เลยครับ</p>
+      {settings && settings.qrImage && (
+        <div className="card" style={{marginTop:16,textAlign:"center"}}>
+          <p style={{fontSize:13,color:"#7A6A5C",marginBottom:8}}>สแกนเพื่อโอนเงิน</p>
+          <img src={settings.qrImage} alt="QR ชำระเงิน" style={{width:200,height:200,objectFit:"contain",margin:"0 auto"}}/>
+          <p style={{fontSize:14,fontWeight:600,marginTop:8}}>{settings.accountName}</p>
+          <p className="mono" style={{fontSize:18,fontWeight:700,color:"var(--coral)",marginTop:4}}>ยอดโอน {baht(order.total)}฿</p>
+        </div>
+      )}
       <button className="btn-teal" style={{marginTop:20}} onClick={onNewOrder}>สั่งเพิ่มอีกออเดอร์</button>
     </div>
   );
@@ -212,6 +220,7 @@ function AdminPanel({onClose}){
   const [orders,setOrders] = useState([]);
   const [tab,setTab] = useState("menu");
   const [error,setError] = useState("");
+  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:""});
 
   const unlock = async () => {
     const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode } });
@@ -219,6 +228,8 @@ function AdminPanel({onClose}){
     setOrders(await res.json());
     const c = await fetch(`${API_BASE}/api/catalog`).then(r=>r.json());
     setCatalog(c);
+    const s = await fetch(`${API_BASE}/api/settings`).then(r=>r.json());
+    setPaySettings(s);
     setUnlocked(true);
   };
 
@@ -232,6 +243,15 @@ function AdminPanel({onClose}){
   };
   const updateProduct = (pid, patch) => saveCatalog(catalog.map(p=>p.id===pid?{...p,...patch}:p));
   const updateVariant = (pid, vid, patch) => saveCatalog(catalog.map(p=> p.id!==pid ? p : {...p, variants:p.variants.map(v=>v.id===vid?{...v,...patch}:v)}));
+
+  const savePaySettings = async (next) => {
+    setPaySettings(next);
+    await fetch(`${API_BASE}/api/settings`, {
+      method:"PUT",
+      headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
+      body: JSON.stringify(next),
+    });
+  };
 
   const setOrderStatus = async (code, status) => {
     setOrders(orders.map(o=>o.code===code?{...o,status}:o));
@@ -267,6 +287,7 @@ function AdminPanel({onClose}){
       <div style={{display:"flex",gap:8,padding:"12px 16px"}}>
         <Pill active={tab==="menu"} onClick={()=>setTab("menu")}>แก้ไขเมนู/ราคา/รูป</Pill>
         <Pill active={tab==="orders"} onClick={()=>setTab("orders")}>ออเดอร์ ({orders.length})</Pill>
+        <Pill active={tab==="pay"} onClick={()=>setTab("pay")}>การชำระเงิน</Pill>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 32px"}}>
         {tab==="menu" && catalog.map(p=>(
@@ -286,6 +307,15 @@ function AdminPanel({onClose}){
             ))}
           </div>
         ))}
+        {tab==="pay" && (
+          <div className="card">
+            <label style={{fontSize:12,color:"#7A6A5C"}}>ลิงก์รูป QR</label>
+            <input type="text" value={paySettings.qrImage} onChange={e=>savePaySettings({...paySettings,qrImage:e.target.value})} style={{marginBottom:12}}/>
+            <label style={{fontSize:12,color:"#7A6A5C"}}>ชื่อบัญชี/พร้อมเพย์</label>
+            <input type="text" value={paySettings.accountName} onChange={e=>savePaySettings({...paySettings,accountName:e.target.value})}/>
+            {paySettings.qrImage && <img src={paySettings.qrImage} alt="QR" style={{width:160,marginTop:12}}/>}
+          </div>
+        )}
         {tab==="orders" && (orders.length===0 ? <p style={{textAlign:"center",color:"#9C8A7A",padding:"30px 0"}}>ยังไม่มีออเดอร์</p> :
           [...orders].reverse().map(o=>(
             <div key={o.code} className="card" style={{marginBottom:12}}>
@@ -320,9 +350,11 @@ function App(){
   const [lastOrder,setLastOrder] = useState(null);
   const [submitting,setSubmitting] = useState(false);
   const [adminOpen,setAdminOpen] = useState(false);
+  const [settings,setSettings] = useState(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/catalog`).then(r=>r.json()).then(setCatalog).catch(()=>{});
+    fetch(`${API_BASE}/api/settings`).then(r=>r.json()).then(setSettings).catch(()=>{});
   }, []);
 
   const addToCart = useCallback((product,variant,qty) => {
@@ -388,7 +420,7 @@ function App(){
           onBack={()=>setScreen("shop")} onConfirm={confirmOrder}/>
       )}
       {screen==="confirm" && lastOrder && (
-        <ConfirmScreen order={lastOrder} onNewOrder={()=>{setLastOrder(null);setScreen("shop");}}/>
+        <ConfirmScreen order={lastOrder} settings={settings} onNewOrder={()=>{setLastOrder(null);setScreen("shop");}}/>
       )}
 
       {screen==="shop" && itemCount>0 && (
@@ -411,12 +443,12 @@ function App(){
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
-  <script>
-     const __src = document.getElementById('app-source').textContent;
-     const __out = Babel.transform(__src, { presets: [["react", { runtime: "classic" }]] }).code;
-     const __s = document.createElement('script');
-     __s.textContent = __out;
-     document.body.appendChild(__s);
-   </script>
+<script>
+  const __src = document.getElementById('app-source').textContent;
+  const __out = Babel.transform(__src, { presets: [["react", { runtime: "classic" }]] }).code;
+  const __s = document.createElement('script');
+  __s.textContent = __out;
+  document.body.appendChild(__s);
+</script>
 </body>
 </html>
