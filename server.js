@@ -357,5 +357,36 @@ function buildAdminFlex(order) {
   };
 }
 
+/* -------------------------------------------------------------
+   รีเซ็ตสถานะ "หมด" ของทุกเมนูกลับเป็นมีสินค้า อัตโนมัติทุกวัน 06:00 น. (เวลาไทย)
+------------------------------------------------------------- */
+function resetSoldOut() {
+  try {
+    const catalog = readCatalog();
+    const updated = catalog.map((p) => ({ ...p, soldOut: false }));
+    writeCatalog(updated);
+    console.log('Auto-reset sold-out status at', new Date().toISOString());
+  } catch (err) {
+    console.error('reset sold-out error:', err);
+  }
+}
+function msUntilNextBangkok6AM() {
+  const now = new Date();
+  const bangkokNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const target = new Date(Date.UTC(bangkokNow.getUTCFullYear(), bangkokNow.getUTCMonth(), bangkokNow.getUTCDate(), 6, 0, 0));
+  if (target <= bangkokNow) target.setUTCDate(target.getUTCDate() + 1);
+  const targetReal = new Date(target.getTime() - 7 * 60 * 60 * 1000);
+  return targetReal.getTime() - now.getTime();
+}
+function scheduleDailyReset() {
+  const delay = msUntilNextBangkok6AM();
+  console.log(`Next auto-reset in ${Math.round(delay / 60000)} minutes`);
+  setTimeout(() => {
+    resetSoldOut();
+    setInterval(resetSoldOut, 24 * 60 * 60 * 1000);
+  }, delay);
+}
+scheduleDailyReset();
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`LINE webhook server running on port ${PORT}`));
