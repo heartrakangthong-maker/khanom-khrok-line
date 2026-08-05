@@ -84,32 +84,39 @@ function ProductCard({product,onAdd}){
   const [qty,setQty] = useState(1);
   const [flash,setFlash] = useState(false);
   const variant = product.variants.find(v=>v.id===variantId) || product.variants[0];
+  const soldOut = !!product.soldOut;
   const add = () => {
+    if (soldOut) return;
     onAdd(product, variant, qty);
     setQty(1); setFlash(true); setTimeout(()=>setFlash(false),500);
   };
   return (
-    <div className="card" style={{marginBottom:12}}>
+    <div className="card" style={{marginBottom:12, opacity: soldOut ? 0.6 : 1}}>
       <div style={{display:"flex",gap:12}}>
         <Thumb product={product}/>
         <div style={{minWidth:0,flex:1}}>
           <h3 className="mitr" style={{margin:0,fontSize:15,fontWeight:600}}>{product.name}</h3>
           <p style={{margin:"2px 0 0",fontSize:12,color:"#7A6A5C"}}>{product.tagline}</p>
+          {soldOut && <span style={{display:"inline-block",marginTop:6,fontSize:11,fontWeight:700,color:"#fff",background:"var(--coral)",padding:"2px 10px",borderRadius:999}}>สินค้าหมด</span>}
         </div>
       </div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:12}}>
-        {product.variants.map(v=>(
-          <Pill key={v.id} active={v.id===variantId} onClick={()=>setVariantId(v.id)}>
-            {v.label} · {baht(v.price)}฿
-          </Pill>
-        ))}
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
-        <Stepper value={qty} onChange={setQty} min={1}/>
-        <button className="btn-teal" style={{background:flash?"#527A54":"#146B6E"}} onClick={add}>
-          {flash ? "เพิ่มแล้ว ✓" : `ใส่ตะกร้า ${baht(variant.price*qty)}฿`}
-        </button>
-      </div>
+      {!soldOut && (
+        <React.Fragment>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:12}}>
+            {product.variants.map(v=>(
+              <Pill key={v.id} active={v.id===variantId} onClick={()=>setVariantId(v.id)}>
+                {v.label} · {baht(v.price)}฿
+              </Pill>
+            ))}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
+            <Stepper value={qty} onChange={setQty} min={1}/>
+            <button className="btn-teal" style={{background:flash?"#527A54":"#146B6E"}} onClick={add}>
+              {flash ? "เพิ่มแล้ว ✓" : `ใส่ตะกร้า ${baht(variant.price*qty)}฿`}
+            </button>
+          </div>
+        </React.Fragment>
+      )}
     </div>
   );
 }
@@ -278,6 +285,20 @@ function AdminPanel({onClose}){
   const updateProduct = (pid, patch) => saveCatalog(catalog.map(p=>p.id===pid?{...p,...patch}:p));
   const updateVariant = (pid, vid, patch) => saveCatalog(catalog.map(p=> p.id!==pid ? p : {...p, variants:p.variants.map(v=>v.id===vid?{...v,...patch}:v)}));
 
+  const notifySoldOut = async (productName) => {
+    if (!window.confirm(`ส่งข้อความแจ้งลูกค้าทุกคนว่า "${productName}" หมดแล้วใช่ไหม?`)) return;
+    try {
+      await fetch(`${API_BASE}/api/notify-soldout`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
+        body: JSON.stringify({ productName }),
+      });
+      alert("ส่งข้อความแจ้งเตือนแล้วครับ");
+    } catch (e) {
+      alert("ส่งไม่สำเร็จ ลองใหม่อีกครั้ง");
+    }
+  };
+
   const savePaySettings = async (next) => {
     setPaySettings(next);
     await fetch(`${API_BASE}/api/settings`, {
@@ -339,6 +360,16 @@ function AdminPanel({onClose}){
                 <input type="number" value={v.price} onChange={e=>updateVariant(p.id,v.id,{price:Number(e.target.value)||0})} style={{width:80,textAlign:"right"}}/>
               </div>
             ))}
+            <div style={{display:"flex",gap:8,marginTop:10}}>
+              <button
+                className="pill"
+                style={p.soldOut ? {background:"var(--coral)",borderColor:"var(--coral)",color:"#fff",flex:1} : {flex:1}}
+                onClick={()=>updateProduct(p.id,{soldOut: !p.soldOut})}
+              >
+                {p.soldOut ? "✓ ทำเครื่องหมายว่าหมดแล้ว" : "ทำเครื่องหมายว่าหมด"}
+              </button>
+              <button className="btn-teal" onClick={()=>notifySoldOut(p.name)}>📢 แจ้งลูกค้า</button>
+            </div>
           </div>
         ))}
         {tab==="pay" && (
