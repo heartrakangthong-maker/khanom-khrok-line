@@ -33,8 +33,9 @@ const DEFAULT_CATALOG = [
   {
     id: 'khrok',
     name: 'ขนมครกสิงคโปร์',
-    tagline: 'ทำจากใบเตยแท้ หวานน้อย ทำสดใหม่ทุกวัน',
+    tagline: 'หอมกะทิ กรอบนอกนุ่มใน สูตรสิงคโปร์',
     image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/pandan.jfif',
+    soldOut: false,
     emoji: '🥥',
     variants: [
       { id: 'khrok-8', label: '8 ชิ้น', price: 30 },
@@ -45,8 +46,9 @@ const DEFAULT_CATALOG = [
   {
     id: 'babin',
     name: 'ขนมบ้าบิ่นมะพร้าวน้ำหอม',
-    tagline: 'เนื้อมะพร้าวน้ำหอมแน่นๆทุกคำ กรอบนอกนุ่มใน',
+    tagline: 'เนื้อนุ่ม หอมมะพร้าวอ่อนแท้ทั้งกล่อง',
     image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/babin.jfif',
+    soldOut: false,
     emoji: '🍥',
     variants: [{ id: 'babin-1', label: '1 กล่อง', price: 50 }],
   },
@@ -55,6 +57,7 @@ const DEFAULT_CATALOG = [
     name: 'รวมขนมครกสิงคโปร์ + บ้าบิ่น',
     tagline: 'อยากกินสองอย่างในกล่องเดียว จบในออเดอร์เดียว',
     image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/mixbabin.jfif',
+    soldOut: false,
     emoji: '🎁',
     variants: [
       { id: 'combo-s', label: 'กล่องเล็ก', price: 40 },
@@ -154,6 +157,21 @@ app.put('/api/catalog', express.json(), requireAdmin, (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'catalog must be an array' });
   writeCatalog(req.body);
   res.json({ ok: true });
+});
+
+app.post('/api/notify-soldout', express.json(), requireAdmin, async (req, res) => {
+  try {
+    const { productName } = req.body;
+    if (!productName) return res.status(400).json({ error: 'missing productName' });
+    await client.broadcast({
+      type: 'text',
+      text: `📢 แจ้งให้ทราบครับ\n"${productName}" หมดแล้วสำหรับวันนี้\nขออภัยในความไม่สะดวกครับ 🙏`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('broadcast error:', err);
+    res.status(500).json({ error: 'internal error' });
+  }
 });
 
 app.get('/api/settings', (req, res) => res.json(readSettings()));
