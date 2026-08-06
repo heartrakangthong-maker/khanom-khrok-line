@@ -33,7 +33,7 @@ const DEFAULT_CATALOG = [
   {
     id: 'khrok',
     name: 'ขนมครกสิงคโปร์',
-    tagline: 'หอมกะทิ กรอบนอกนุ่มใน สูตรสิงคโปร์',
+    tagline: 'ทำจากใบเตยแท้ หวานน้อยอย่างมีอารยธรรม',
     image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/pandan.jfif',
     soldOut: false,
     emoji: '🥥',
@@ -46,7 +46,7 @@ const DEFAULT_CATALOG = [
   {
     id: 'babin',
     name: 'ขนมบ้าบิ่นมะพร้าวน้ำหอม',
-    tagline: 'เนื้อนุ่ม หอมมะพร้าวอ่อนแท้ทั้งกล่อง',
+    tagline: 'กรอบนอกนุ่มใน มะพร้าวน้ำหอมแน่นๆแบรนด์BABINBOY',
     image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/babin.jfif',
     soldOut: false,
     emoji: '🍥',
