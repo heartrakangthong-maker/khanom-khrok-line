@@ -42,8 +42,9 @@
 <script type="text/babel-source" id="app-source">
 const { useState, useEffect, useCallback } = React;
 
-const API_BASE = "";
-const LIFF_ID = "2010953976-QdHdT43h";
+/* ====== ตั้งค่าก่อนใช้งานจริง ====== */
+const API_BASE = ""; // เว้นว่างไว้ได้เลย เพราะหน้าเว็บนี้กับเซิร์ฟเวอร์อยู่โดเมนเดียวกัน (Glitch)
+const LIFF_ID = "2010953976-QdHdT43h"; // จาก LINE Developers Console > LIFF — ต้องตั้งหลังได้ URL ของ Glitch แล้ว
 
 function baht(n){ return Number(n).toLocaleString("th-TH"); }
 
@@ -186,6 +187,11 @@ function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
         <div style={{display:"flex",gap:8,marginBottom:12}}>
           {["รับเอง","จัดส่ง"].map(o=><Pill key={o} active={fulfil===o} onClick={()=>setFulfil(o)}>{o}</Pill>)}
         </div>
+        {fulfil==="จัดส่ง" && (
+          <div style={{background:"var(--cream-deep)",borderRadius:12,padding:"10px 12px",marginBottom:12,fontSize:12,color:"var(--plum)",lineHeight:1.6}}>
+            🛵 ทางร้านจะเรียกไรเดอร์ผ่าน <b>Grab Express</b> ไปจัดส่งให้ครับ <b>ค่าส่งคิดตามระยะทางจริง ไม่รวมอยู่ในยอดโอนนี้</b> แอดมินจะแจ้งค่าส่งให้ทราบก่อนเรียกไรเดอร์อีกครั้งนะครับ
+          </div>
+        )}
         <label style={{fontSize:12,color:"#7A6A5C"}}>{fulfil==="จัดส่ง" ? "ที่อยู่จัดส่ง" : "หมายเหตุ (ถ้ามี)"}</label>
         <textarea rows="2" value={note} onChange={e=>setNote(e.target.value)} style={{marginTop:4}}/>
       </div>
@@ -199,7 +205,7 @@ function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
 }
 
 function ConfirmScreen({order,onNewOrder,settings}){
-  const [slipStatus,setSlipStatus] = useState("idle");
+  const [slipStatus,setSlipStatus] = useState("idle"); // idle | uploading | done | error
   const fileInputRef = React.useRef(null);
 
   const handleSlipUpload = (e) => {
