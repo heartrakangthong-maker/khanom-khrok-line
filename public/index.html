@@ -267,7 +267,7 @@ function AdminPanel({onClose}){
   const [orders,setOrders] = useState([]);
   const [tab,setTab] = useState("menu");
   const [error,setError] = useState("");
-  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:""});
+  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:"",faqs:[]});
 
   const unlock = async () => {
     const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode }, cache:"no-store" });
@@ -354,6 +354,7 @@ function AdminPanel({onClose}){
         <Pill active={tab==="menu"} onClick={()=>setTab("menu")}>แก้ไขเมนู/ราคา/รูป</Pill>
         <Pill active={tab==="orders"} onClick={()=>setTab("orders")}>ออเดอร์ ({orders.length})</Pill>
         <Pill active={tab==="pay"} onClick={()=>setTab("pay")}>การชำระเงิน</Pill>
+        <Pill active={tab==="faq"} onClick={()=>setTab("faq")}>คำถามที่พบบ่อย</Pill>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 32px"}}>
         {tab==="menu" && catalog.map(p=>(
@@ -390,6 +391,32 @@ function AdminPanel({onClose}){
             <label style={{fontSize:12,color:"#7A6A5C"}}>ชื่อบัญชี/พร้อมเพย์</label>
             <input type="text" value={paySettings.accountName} onChange={e=>savePaySettings({...paySettings,accountName:e.target.value})}/>
             {paySettings.qrImage && <img src={paySettings.qrImage} alt="QR" style={{width:160,marginTop:12}}/>}
+          </div>
+        )}
+        {tab==="faq" && (
+          <div>
+            {(paySettings.faqs||[]).map((f,i)=>(
+              <div key={i} className="card" style={{marginBottom:12}}>
+                <label style={{fontSize:12,color:"#7A6A5C"}}>คีย์เวิร์ด (คั่นด้วยจุลภาค)</label>
+                <input type="text" value={(f.keywords||[]).join(", ")} onChange={e=>{
+                  const next = {...paySettings, faqs: paySettings.faqs.map((x,xi)=> xi===i ? {...x, keywords: e.target.value.split(",").map(s=>s.trim()).filter(Boolean)} : x)};
+                  savePaySettings(next);
+                }} style={{marginBottom:8}}/>
+                <label style={{fontSize:12,color:"#7A6A5C"}}>คำตอบ</label>
+                <textarea rows="2" value={f.answer||""} onChange={e=>{
+                  const next = {...paySettings, faqs: paySettings.faqs.map((x,xi)=> xi===i ? {...x, answer:e.target.value} : x)};
+                  savePaySettings(next);
+                }} style={{marginBottom:8}}/>
+                <button className="pill" onClick={()=>{
+                  const next = {...paySettings, faqs: paySettings.faqs.filter((_,xi)=>xi!==i)};
+                  savePaySettings(next);
+                }}>ลบคำถามนี้</button>
+              </div>
+            ))}
+            <button className="btn-teal" style={{width:"100%"}} onClick={()=>{
+              const next = {...paySettings, faqs: [...(paySettings.faqs||[]), {keywords:[""], answer:""}]};
+              savePaySettings(next);
+            }}>+ เพิ่มคำถามใหม่</button>
           </div>
         )}
         {tab==="orders" && (orders.length===0 ? <p style={{textAlign:"center",color:"#9C8A7A",padding:"30px 0"}}>ยังไม่มีออเดอร์</p> :
