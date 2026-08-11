@@ -513,7 +513,11 @@ function App(){
         onQtyChange={changeQty} onRemove={removeItem} total={total}
         onCheckout={()=>{setCartOpen(false);setScreen("checkout");}}/>
 
-      {adminOpen && <AdminPanel onClose={()=>setAdminOpen(false)}/>}
+      {adminOpen && <AdminPanel onClose={()=>{
+        setAdminOpen(false);
+        fetch(`${API_BASE}/api/catalog`).then(r=>r.json()).then(setCatalog).catch(()=>{});
+        fetch(`${API_BASE}/api/settings`).then(r=>r.json()).then(setSettings).catch(()=>{});
+      }}/>}
     </div>
   );
 }
