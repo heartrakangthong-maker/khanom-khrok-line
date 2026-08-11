@@ -186,6 +186,11 @@ function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
         <div style={{display:"flex",gap:8,marginBottom:12}}>
           {["รับเอง","จัดส่ง"].map(o=><Pill key={o} active={fulfil===o} onClick={()=>setFulfil(o)}>{o}</Pill>)}
         </div>
+        {fulfil==="จัดส่ง" && (
+          <div style={{background:"var(--cream-deep)",borderRadius:12,padding:"10px 12px",marginBottom:12,fontSize:12,color:"var(--plum)",lineHeight:1.6}}>
+            🛵 ทางร้านจะเรียกไรเดอร์ผ่าน <b>Grab Express</b> ไปจัดส่งให้ครับ <b>ค่าส่งคิดตามระยะทางจริง ไม่รวมอยู่ในยอดโอนนี้</b> แอดมินจะแจ้งค่าส่งให้ทราบก่อนเรียกไรเดอร์อีกครั้งนะครับ
+          </div>
+        )}
         <label style={{fontSize:12,color:"#7A6A5C"}}>{fulfil==="จัดส่ง" ? "ที่อยู่จัดส่ง" : "หมายเหตุ (ถ้ามี)"}</label>
         <textarea rows="2" value={note} onChange={e=>setNote(e.target.value)} style={{marginTop:4}}/>
       </div>
@@ -264,12 +269,12 @@ function AdminPanel({onClose}){
   const [paySettings,setPaySettings] = useState({qrImage:"",accountName:""});
 
   const unlock = async () => {
-    const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode } });
+    const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode }, cache:"no-store" });
     if (!res.ok) { setError("รหัสผ่านไม่ถูกต้อง"); return; }
     setOrders(await res.json());
-    const c = await fetch(`${API_BASE}/api/catalog`).then(r=>r.json());
+    const c = await fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json());
     setCatalog(c);
-    const s = await fetch(`${API_BASE}/api/settings`).then(r=>r.json());
+    const s = await fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json());
     setPaySettings(s);
     setUnlocked(true);
   };
@@ -424,8 +429,8 @@ function App(){
   const [settings,setSettings] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/catalog`).then(r=>r.json()).then(setCatalog).catch(()=>{});
-    fetch(`${API_BASE}/api/settings`).then(r=>r.json()).then(setSettings).catch(()=>{});
+    fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json()).then(setCatalog).catch(()=>{});
+    fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json()).then(setSettings).catch(()=>{});
   }, []);
 
   const addToCart = useCallback((product,variant,qty) => {
@@ -507,7 +512,11 @@ function App(){
         onQtyChange={changeQty} onRemove={removeItem} total={total}
         onCheckout={()=>{setCartOpen(false);setScreen("checkout");}}/>
 
-      {adminOpen && <AdminPanel onClose={()=>setAdminOpen(false)}/>}
+      {adminOpen && <AdminPanel onClose={()=>{
+        setAdminOpen(false);
+        fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json()).then(setCatalog).catch(()=>{});
+        fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json()).then(setSettings).catch(()=>{});
+      }}/>}
     </div>
   );
 }
