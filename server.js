@@ -110,6 +110,13 @@ const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const DEFAULT_SETTINGS = {
   qrImage: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/qr.jpg',
   accountName: 'สุวัจนะ เกียรติพันธุ์สดใส · พร้อมเพย์ 095-812-9919',
+  faqs: [
+    { keywords: ['เวลา', 'เปิด', 'ปิด', 'กี่โมง'], answer: 'ร้านเปิดทุกวัน 08:00 - 18:00 น. ครับ 😊' },
+    { keywords: ['ที่อยู่', 'อยู่ที่ไหน', 'แผนที่', 'ร้านอยู่'], answer: 'สอบถามตำแหน่งร้านหรือขอแชร์โลเคชันได้เลยครับ แอดมินจะส่งให้ทันที' },
+    { keywords: ['ค่าส่ง', 'จัดส่ง', 'ส่งถึง', 'delivery'], answer: 'จัดส่งผ่าน Grab Express ครับ คิดค่าส่งตามระยะทางจริง แอดมินจะแจ้งราคาก่อนเรียกไรเดอร์ทุกครั้งครับ' },
+    { keywords: ['โอนเงิน', 'จ่ายเงิน', 'ชำระเงิน', 'พร้อมเพย์', 'บัญชี'], answer: 'ชำระผ่าน QR พร้อมเพย์ได้เลยครับ ระบบจะโชว์ QR ให้อัตโนมัติหลังยืนยันออเดอร์ในหน้าสั่งซื้อ' },
+    { keywords: ['เก็บได้กี่วัน', 'อยู่ได้นาน', 'หมดอายุ', 'เก็บนาน'], answer: 'แนะนำทานภายในวันที่ซื้อเพื่อความอร่อยสดใหม่ที่สุดครับ 😊' },
+  ],
 };
 function readSettings() {
   if (!fs.existsSync(SETTINGS_FILE)) {
@@ -316,6 +323,14 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
   }
 });
 
+function matchFaq(text, faqs) {
+  const lower = text.toLowerCase();
+  for (const f of faqs || []) {
+    if ((f.keywords || []).some((k) => k && lower.includes(k.toLowerCase()))) return f.answer;
+  }
+  return null;
+}
+
 async function handleEvent(event) {
   // แอดมินกดปุ่มในการ์ดแจ้งเตือนออเดอร์ เพื่อเปลี่ยนสถานะ
   if (event.type === 'postback') {
@@ -352,6 +367,32 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, {
         type: 'text',
         text: `สั่งขนมครกสิงคโปร์ได้ที่นี่เลยครับ 🍯\n${process.env.LIFF_URL || '(ยังไม่ได้ตั้งค่า LIFF_URL)'}`,
+      });
+    }
+
+    const settings = readSettings();
+    const faqAnswer = matchFaq(text, settings.faqs);
+    if (faqAnswer) {
+      return client.replyMessage(event.replyToken, { type: 'text', text: faqAnswer });
+    }
+
+    await client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: 'ขอบคุณที่ทักมานะครับ 😊 แอดมินเห็นข้อความแล้วจะรีบตอบกลับ\nระหว่างนี้เลือกหัวข้อด้านล่างได้เลยครับ',
+      quickReply: {
+        items: [
+          { type: 'action', action: { type: 'message', label: '📋 ดูเมนู', text: 'เมนู' } },
+          { type: 'action', action: { type: 'message', label: '⏰ เวลาทำการ', text: 'เวลาเปิดกี่โมง' } },
+          { type: 'action', action: { type: 'message', label: '🛵 ค่าจัดส่ง', text: 'ค่าส่งเท่าไหร่' } },
+          { type: 'action', action: { type: 'message', label: '💰 วิธีชำระเงิน', text: 'ชำระเงินยังไง' } },
+        ],
+      },
+    });
+
+    if (ADMIN_USER_ID) {
+      await client.pushMessage(ADMIN_USER_ID, {
+        type: 'text',
+        text: `💬 ลูกค้าทักมา: "${text}"\n(บอทตอบเองไม่ได้ กรุณาตอบด้วยครับ)`,
       });
     }
   }
