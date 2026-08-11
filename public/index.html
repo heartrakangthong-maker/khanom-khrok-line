@@ -282,11 +282,16 @@ function AdminPanel({onClose}){
 
   const saveCatalog = async (next) => {
     setCatalog(next);
-    await fetch(`${API_BASE}/api/catalog`, {
-      method:"PUT",
-      headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
-      body: JSON.stringify(next),
-    });
+    try {
+      const res = await fetch(`${API_BASE}/api/catalog`, {
+        method:"PUT",
+        headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
+        body: JSON.stringify(next),
+      });
+      if (!res.ok) alert(`บันทึกไม่สำเร็จ (${res.status}) ลองใหม่อีกครั้ง`);
+    } catch (e) {
+      alert("บันทึกไม่สำเร็จ เช็คอินเทอร์เน็ตแล้วลองใหม่");
+    }
   };
   const updateProduct = (pid, patch) => saveCatalog(catalog.map(p=>p.id===pid?{...p,...patch}:p));
   const updateVariant = (pid, vid, patch) => saveCatalog(catalog.map(p=> p.id!==pid ? p : {...p, variants:p.variants.map(v=>v.id===vid?{...v,...patch}:v)}));
