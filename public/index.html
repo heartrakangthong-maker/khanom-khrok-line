@@ -42,8 +42,9 @@
 <script type="text/babel-source" id="app-source">
 const { useState, useEffect, useCallback } = React;
 
-const API_BASE = "";
-const LIFF_ID = "2010953976-QdHdT43h";
+/* ====== ตั้งค่าก่อนใช้งานจริง ====== */
+const API_BASE = ""; // เว้นว่างไว้ได้เลย เพราะหน้าเว็บนี้กับเซิร์ฟเวอร์อยู่โดเมนเดียวกัน (Glitch)
+const LIFF_ID = "2010953976-QdHdT43h"; // จาก LINE Developers Console > LIFF — ต้องตั้งหลังได้ URL ของ Glitch แล้ว
 
 function baht(n){ return Number(n).toLocaleString("th-TH"); }
 
@@ -204,7 +205,7 @@ function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
 }
 
 function ConfirmScreen({order,onNewOrder,settings}){
-  const [slipStatus,setSlipStatus] = useState("idle");
+  const [slipStatus,setSlipStatus] = useState("idle"); // idle | uploading | done | error
   const fileInputRef = React.useRef(null);
 
   const handleSlipUpload = (e) => {
@@ -429,8 +430,13 @@ function App(){
   const [settings,setSettings] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json()).then(setCatalog).catch(()=>{});
-    fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json()).then(setSettings).catch(()=>{});
+    const loadData = () => {
+      fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json()).then(setCatalog).catch(()=>{});
+      fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json()).then(setSettings).catch(()=>{});
+    };
+    loadData();
+    const interval = setInterval(loadData, 15000); // รีเฟรชเมนู/ราคาอัตโนมัติทุก 15 วินาที
+    return () => clearInterval(interval);
   }, []);
 
   const addToCart = useCallback((product,variant,qty) => {
