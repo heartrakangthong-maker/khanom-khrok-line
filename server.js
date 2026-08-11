@@ -43,7 +43,7 @@ const DEFAULT_CATALOG = [
   {
     id: 'khrok',
     name: 'ขนมครกสิงคโปร์',
-    tagline: 'ทำจากใบเตยแท้100% หอมนุ่ม หวานน้อย',
+    tagline: 'ทำจากใบเตยแท้คั้นสด100% หอมนุ่ม หวานน้อย ทำสดใหม่ทุกวัน',
     image: 'https://raw.githubusercontent.com/heartrakangthong-maker/khanom-khrok-line/main/public/pandan.jfif',
     soldOut: false,
     emoji: '🥥',
@@ -117,7 +117,26 @@ const DEFAULT_SETTINGS = {
     { keywords: ['โอนเงิน', 'จ่ายเงิน', 'ชำระเงิน', 'พร้อมเพย์', 'บัญชี'], answer: 'ชำระผ่าน QR พร้อมเพย์ได้เลยครับ ระบบจะโชว์ QR ให้อัตโนมัติหลังยืนยันออเดอร์ในหน้าสั่งซื้อ' },
     { keywords: ['เก็บได้กี่วัน', 'อยู่ได้นาน', 'หมดอายุ', 'เก็บนาน'], answer: 'แนะนำทานภายในวันที่ซื้อเพื่อความอร่อยสดใหม่ที่สุดครับ 😊' },
   ],
+  lottery: [
+    { label: 'ลด 10% ครั้งหน้า', weight: 20 },
+    { label: 'ฟรีบ้าบิ่น 1 กล่อง', weight: 15 },
+    { label: 'ลด 5% ครั้งหน้า', weight: 25 },
+    { label: 'ลุ้นใหม่ครั้งหน้านะ', weight: 20 },
+    { label: 'ฟรีค่าส่งครั้งหน้า', weight: 15 },
+    { label: 'ลด 20% ครั้งหน้า', weight: 5 },
+  ],
 };
+
+function pickWeighted(items) {
+  const total = items.reduce((s, it) => s + (Number(it.weight) || 0), 0);
+  if (total <= 0) return items[Math.floor(Math.random() * items.length)];
+  let r = Math.random() * total;
+  for (const it of items) {
+    r -= Number(it.weight) || 0;
+    if (r <= 0) return it;
+  }
+  return items[items.length - 1];
+}
 function readSettings() {
   if (!fs.existsSync(SETTINGS_FILE)) {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
@@ -219,6 +238,38 @@ app.post('/api/notify-soldout', express.json(), requireAdmin, async (req, res) =
 app.get('/api/settings', (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(readSettings());
+});
+
+app.post('/api/lottery/:code', express.json(), async (req, res) => {
+  try {
+    const orders = readOrders();
+    const order = orders.find((o) => o.code === req.params.code);
+    if (!order) return res.status(404).json({ error: 'order not found' });
+
+    if (order.lotteryResult) {
+      return res.json({ prize: order.lotteryResult });
+    }
+
+    const settings = readSettings();
+    const items = (settings.lottery || []).filter((it) => it.label);
+    if (items.length === 0) return res.status(400).json({ error: 'no prizes configured' });
+
+    const winner = pickWeighted(items);
+    order.lotteryResult = winner.label;
+    writeOrders(orders);
+
+    if (ADMIN_USER_ID) {
+      await client.pushMessage(ADMIN_USER_ID, {
+        type: 'text',
+        text: `🎰 ออเดอร์ ${order.code} จับสลากได้รางวัล: ${winner.label}`,
+      });
+    }
+
+    res.json({ prize: winner.label });
+  } catch (err) {
+    console.error('lottery error:', err);
+    res.status(500).json({ error: 'internal error' });
+  }
 });
 app.put('/api/settings', express.json(), requireAdmin, (req, res) => {
   writeSettings(req.body);
