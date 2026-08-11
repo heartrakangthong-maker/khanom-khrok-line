@@ -270,12 +270,12 @@ function AdminPanel({onClose}){
   const [paySettings,setPaySettings] = useState({qrImage:"",accountName:""});
 
   const unlock = async () => {
-    const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode } });
+    const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode }, cache:"no-store" });
     if (!res.ok) { setError("รหัสผ่านไม่ถูกต้อง"); return; }
     setOrders(await res.json());
-    const c = await fetch(`${API_BASE}/api/catalog`).then(r=>r.json());
+    const c = await fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json());
     setCatalog(c);
-    const s = await fetch(`${API_BASE}/api/settings`).then(r=>r.json());
+    const s = await fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json());
     setPaySettings(s);
     setUnlocked(true);
   };
@@ -430,8 +430,8 @@ function App(){
   const [settings,setSettings] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/catalog`).then(r=>r.json()).then(setCatalog).catch(()=>{});
-    fetch(`${API_BASE}/api/settings`).then(r=>r.json()).then(setSettings).catch(()=>{});
+    fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json()).then(setCatalog).catch(()=>{});
+    fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json()).then(setSettings).catch(()=>{});
   }, []);
 
   const addToCart = useCallback((product,variant,qty) => {
@@ -515,8 +515,8 @@ function App(){
 
       {adminOpen && <AdminPanel onClose={()=>{
         setAdminOpen(false);
-        fetch(`${API_BASE}/api/catalog`).then(r=>r.json()).then(setCatalog).catch(()=>{});
-        fetch(`${API_BASE}/api/settings`).then(r=>r.json()).then(setSettings).catch(()=>{});
+        fetch(`${API_BASE}/api/catalog`, {cache:"no-store"}).then(r=>r.json()).then(setCatalog).catch(()=>{});
+        fetch(`${API_BASE}/api/settings`, {cache:"no-store"}).then(r=>r.json()).then(setSettings).catch(()=>{});
       }}/>}
     </div>
   );
