@@ -83,7 +83,10 @@ function Thumb({product}){
 function MascotCard({userId}){
   const [data,setData] = useState(null);
   const [redeeming,setRedeeming] = useState(false);
-  const [justFed,setJustFed] = useState(false);
+  const [feeding,setFeeding] = useState(false);
+  const [bathing,setBathing] = useState(false);
+  const [patting,setPatting] = useState(false);
+  const [flash,setFlash] = useState(null); // "fed" | "clean" | null
 
   const load = () => {
     if (!userId) return;
@@ -96,48 +99,148 @@ function MascotCard({userId}){
     setRedeeming(true);
     try {
       await fetch(`${API_BASE}/api/mascot/${userId}/redeem`, { method:"POST" });
-      setJustFed(true);
-      setTimeout(()=>{ setJustFed(false); load(); }, 700);
+      load();
     } finally {
       setRedeeming(false);
     }
+  };
+
+  const feedMascot = async () => {
+    if (feeding || !data?.canFeed) return;
+    setFeeding(true);
+    try {
+      await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
+      setFlash("fed");
+      setTimeout(()=>{ setFlash(null); load(); }, 700);
+    } finally {
+      setFeeding(false);
+    }
+  };
+
+  const bathMascot = async () => {
+    if (bathing || !data?.isDirty) return;
+    setBathing(true);
+    try {
+      await fetch(`${API_BASE}/api/mascot/${userId}/bath`, { method:"POST" });
+      setTimeout(async () => {
+        setFlash("clean");
+        await new Promise(r=>setTimeout(r,600));
+        setFlash(null);
+        load();
+        setBathing(false);
+      }, 1100);
+    } catch(e) {
+      setBathing(false);
+    }
+  };
+
+  const patMascot = () => {
+    if (patting) return;
+    setPatting(true);
+    setTimeout(()=>setPatting(false), 900);
   };
 
   if (!data) return null;
   const progress = data.nextThreshold
     ? Math.min(100, ((data.foodGiven-data.stageStart)/(data.nextThreshold-data.stageStart))*100)
     : 100;
+
   return (
     <div className="card" style={{marginBottom:12,textAlign:"center"}}>
-      <div style={{width:120,height:120,margin:"0 auto",animation:"mascot-bob 2.4s ease-in-out infinite"}}>
-        <img
-          src={data.image}
-          alt={data.stageName}
-          style={{
-            width:"100%", height:"100%", objectFit:"contain",
-            transform: justFed ? "scale(1.12)" : "scale(1)",
-            transition:"transform .25s cubic-bezier(.34,1.56,.64,1)",
-          }}
-        />
+      <div style={{position:"relative",width:130,height:130,margin:"0 auto"}}>
+        <div style={{
+          width:"100%",height:"100%",
+          animation: bathing ? "none" : "mascot-bob 2.4s ease-in-out infinite",
+        }}>
+          <img
+            src={data.image}
+            alt={data.stageName}
+            style={{
+              width:"100%", height:"100%", objectFit:"contain",
+              transform: flash==="fed" ? "scale(1.12)" : patting ? "scale(1.06) rotate(-3deg)" : "scale(1)",
+              transition:"transform .25s cubic-bezier(.34,1.56,.64,1)",
+              filter: bathing ? "brightness(1.05)" : "none",
+            }}
+          />
+        </div>
+
+        {/* dirt smudges */}
+        {data.isDirty && !bathing && (
+          <React.Fragment>
+            <div style={{position:"absolute",top:"32%",left:"22%",width:16,height:12,borderRadius:"50%",background:"rgba(140,110,72,.55)",transform:"rotate(-15deg)"}}/>
+            <div style={{position:"absolute",top:"55%",left:"66%",width:20,height:14,borderRadius:"50%",background:"rgba(140,110,72,.5)",transform:"rotate(10deg)"}}/>
+            <div style={{position:"absolute",top:"68%",left:"38%",width:14,height:10,borderRadius:"50%",background:"rgba(140,110,72,.5)"}}/>
+          </React.Fragment>
+        )}
+
+        {/* bath bubbles */}
+        {bathing && (
+          <div style={{position:"absolute",inset:-10,pointerEvents:"none"}}>
+            {[...Array(9)].map((_,i)=>(
+              <div key={i} style={{
+                position:"absolute", left:`${10+((i*37)%85)}%`, bottom:0,
+                width:8+((i%3)*5), height:8+((i%3)*5), borderRadius:"50%",
+                background:"rgba(255,255,255,.65)", border:"1px solid rgba(255,255,255,.9)",
+                animation:`bubble-rise ${0.9+((i%4)*0.15)}s ease-in ${i*0.08}s forwards`,
+              }}/>
+            ))}
+          </div>
+        )}
+
+        {/* pat hearts */}
+        {patting && (
+          <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+            {[...Array(4)].map((_,i)=>(
+              <div key={i} style={{
+                position:"absolute", top:"20%", left:`${30+i*15}%`, fontSize:16,
+                animation:`heart-rise .9s ease-out ${i*0.1}s forwards`, opacity:0,
+              }}>💚</div>
+            ))}
+          </div>
+        )}
       </div>
-      <p className="mitr" style={{margin:"4px 0 2px",fontSize:15,fontWeight:700}}>{data.stageName}</p>
+
+      <p className="mitr" style={{margin:"6px 0 2px",fontSize:15,fontWeight:700}}>
+        {data.stageName}{data.isDirty && !bathing ? " · ตัวเลอะจัง 🫧" : ""}
+      </p>
       <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 4px"}}>
         {data.nextThreshold ? `อาหารแล้ว ${data.foodGiven}/${data.nextThreshold} ชิ้น จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
       </p>
       <div style={{height:8,background:"var(--cream-deep)",borderRadius:999,overflow:"hidden",margin:"0 0 14px"}}>
         <div style={{height:"100%",width:`${progress}%`,background:"var(--leaf)",borderRadius:999,transition:"width .4s"}}/>
       </div>
+
       <div className="card" style={{background:"var(--cream)",boxShadow:"none",padding:12,marginBottom:12}}>
         <p style={{fontSize:13,margin:0}}>แต้มของคุณ: <b className="mono" style={{color:"var(--coral)"}}>{data.availablePoints}</b> แต้ม</p>
         <p style={{fontSize:11,color:"#9C8A7A",margin:"2px 0 0"}}>ทุก 100฿ ในบิลได้ 1 แต้ม · ใช้ {data.pointsPerFood} แต้มแลกอาหาร 1 ชิ้น</p>
+        <p style={{fontSize:13,margin:"8px 0 0"}}>อาหารในคลัง: <b className="mono" style={{color:"var(--leaf)"}}>{data.foodInventory}</b> ชิ้น</p>
       </div>
-      {data.nextThreshold && (
-        <button className="btn-teal" style={{background: justFed ? "var(--leaf)" : (data.canRedeem ? "var(--teal)" : "#C9BBA5")}} disabled={redeeming || !data.canRedeem} onClick={redeem}>
-          {justFed ? "อร่อยมาก! 😋" : `🍽️ แลกแต้มเป็นอาหาร (ใช้ ${data.pointsPerFood} แต้ม)`}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {data.nextThreshold && (
+          <button className="btn-teal" style={{background: data.canRedeem ? "var(--teal)" : "#C9BBA5"}} disabled={redeeming || !data.canRedeem} onClick={redeem}>
+            💰 แลกแต้มเป็นอาหาร (ใช้ {data.pointsPerFood} แต้ม)
+          </button>
+        )}
+        {data.nextThreshold && (
+          <button className="btn-teal" style={{background: flash==="fed" ? "var(--leaf)" : (data.canFeed ? "var(--coral)" : "#C9BBA5")}} disabled={feeding || !data.canFeed} onClick={feedMascot}>
+            {flash==="fed" ? "อร่อยมาก! 😋" : `🍽️ ให้อาหารมาสคอต`}
+          </button>
+        )}
+        {data.isDirty && (
+          <button className="btn-teal" style={{background: flash==="clean" ? "var(--leaf)" : "#3D7FBF"}} disabled={bathing} onClick={bathMascot}>
+            {bathing ? "กำลังอาบน้ำ... 🫧" : flash==="clean" ? "สะอาดแล้ว! ✨" : "🛁 อาบน้ำให้มาสคอต"}
+          </button>
+        )}
+        <button className="pill" style={{width:"100%"}} disabled={patting} onClick={patMascot}>
+          🤚 ลูบหัวมาสคอต
         </button>
-      )}
+      </div>
+
       <style>{`
         @keyframes mascot-bob { 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(-6px) rotate(-2deg);} }
+        @keyframes bubble-rise { 0%{ transform: translateY(0) scale(.6); opacity:0;} 15%{ opacity:1;} 100%{ transform: translateY(-140px) scale(1); opacity:0;} }
+        @keyframes heart-rise { 0%{ transform: translateY(0) scale(.5); opacity:0;} 20%{ opacity:1;} 100%{ transform: translateY(-46px) scale(1.1); opacity:0;} }
       `}</style>
     </div>
   );
