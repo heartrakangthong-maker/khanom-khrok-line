@@ -304,7 +304,7 @@ function MascotCard({userId}){
 
       <div className="card" style={{background:"var(--cream)",boxShadow:"none",padding:12,marginBottom:12}}>
         <p style={{fontSize:13,margin:0}}>แต้มของคุณ: <b className="mono" style={{color:"var(--coral)"}}>{data.availablePoints}</b> แต้ม</p>
-        <p style={{fontSize:11,color:"#9C8A7A",margin:"2px 0 0"}}>ทุก 100฿ ในบิลได้ 1 แต้ม · ใช้ {data.pointsPerFood} แต้มแลกอาหาร 1 ชิ้น</p>
+        <p style={{fontSize:11,color:"#9C8A7A",margin:"2px 0 0"}}>ทุก 100฿ ในบิลที่ทำเสร็จแล้วได้ 1 แต้ม · ใช้ {data.pointsPerFood} แต้มแลกอาหาร 1 ชิ้น</p>
         <p style={{fontSize:13,margin:"8px 0 0"}}>อาหารในคลัง: <b className="mono" style={{color:"var(--leaf)"}}>{data.foodInventory}</b> ชิ้น</p>
       </div>
 
@@ -737,6 +737,61 @@ function LotteryScreen({orderCode,onDone}){
   );
 }
 
+function OrderCard({o,setOrderStatus,setLotteryUsed,grantMascotFood}){
+  const [grantAmount,setGrantAmount] = useState(3);
+  return (
+    <div className="card" style={{marginBottom:12}}>
+      <p className="mono" style={{color:"var(--coral)",fontWeight:700,margin:0}}>{o.code}</p>
+      <p style={{margin:"2px 0",fontSize:14}}>{o.name}</p>
+      <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>{o.fulfil}{o.note ? " · "+o.note : ""}</p>
+      <div style={{fontSize:13,margin:"8px 0"}}>
+        {o.items.map((it,i)=><div key={i}>{it.productName} ({it.variantLabel}) × {it.qty}</div>)}
+      </div>
+      {o.slipImage && (
+        <div style={{margin:"8px 0"}}>
+          <p style={{fontSize:12,color:"#7A6A5C",marginBottom:4}}>สลิปโอนเงิน · ยอดที่ต้องได้รับ {baht(o.total)}฿</p>
+          <img src={o.slipImage} alt="สลิป" style={{width:120,borderRadius:8,cursor:"pointer",border:"1px solid #F3E6D3"}} onClick={()=>window.open(o.slipImage,"_blank")}/>
+          {o.slipDuplicateOf && (
+            <p style={{color:"var(--coral)",fontSize:12,fontWeight:700,marginTop:6}}>⚠️ สลิปนี้ตรงกับออเดอร์ {o.slipDuplicateOf} เป๊ะ ตรวจสอบก่อนว่าไม่ใช่สลิปซ้ำ</p>
+          )}
+        </div>
+      )}
+      {o.lotteryResult && (
+        <div style={{display:"flex",alignItems:"center",gap:8,margin:"6px 0",fontSize:13}}>
+          <span>🎰 รางวัล: <b>{o.lotteryResult}</b></span>
+          <button
+            className="pill"
+            style={o.lotteryUsed ? {} : {background:"var(--mustard)",borderColor:"var(--mustard)",color:"#fff"}}
+            onClick={()=>setLotteryUsed(o.code, !o.lotteryUsed)}
+          >
+            {o.lotteryUsed ? "✓ ใช้แล้ว" : "ยังไม่ใช้"}
+          </button>
+        </div>
+      )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span className="mono" style={{fontWeight:700}}>{baht(o.total)}฿</span>
+        <div style={{display:"flex",gap:6}}>
+          {["ใหม่","กำลังทำ","เสร็จแล้ว"].map(s=>(
+            <Pill key={s} active={o.status===s} onClick={()=>setOrderStatus(o.code,s)}>{s}</Pill>
+          ))}
+        </div>
+      </div>
+      {o.userId && (
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <input
+            type="number" min="1" value={grantAmount}
+            onChange={e=>setGrantAmount(Math.max(1, Number(e.target.value)||1))}
+            style={{width:64,textAlign:"center"}}
+          />
+          <button className="pill" style={{flex:1}} onClick={()=>grantMascotFood(o.userId, grantAmount)}>
+            🎁 แจกอาหารมาสคอต +{grantAmount} ให้ลูกค้าคนนี้
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminPanel({onClose}){
   const [passcode,setPasscode] = useState("");
   const [unlocked,setUnlocked] = useState(false);
@@ -899,7 +954,7 @@ function AdminPanel({onClose}){
               savePaySettings(next);
             }} style={{marginTop:6,marginBottom:10}}/>
             <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>
-              ลูกค้าได้ 1 แต้มทุกๆ 100฿ ในบิลที่จ่ายเงินแล้ว ใช้ <b>{paySettings.pointsPerFood||1}</b> แต้ม แลกอาหารมาสคอตได้ 1 ชิ้น
+              ลูกค้าได้ 1 แต้มทุกๆ 100฿ ในบิลที่แอดมินกดสถานะ "เสร็จแล้ว" แล้วเท่านั้น (ตรวจสลิปก่อนกดเสมอ) ใช้ <b>{paySettings.pointsPerFood||1}</b> แต้ม แลกอาหารมาสคอตได้ 1 ชิ้น
             </p>
             <p style={{fontSize:11,color:"#9C8A7A",marginTop:8}}>
               ด่านการเติบโต (คงที่ ไม่ต้องตั้ง): ร่าง 1→2 ใช้ 5 ชิ้น · 2→3 ใช้ 5 ชิ้น · 3→4 ใช้ 10 ชิ้น · 4→5 ใช้ 20 ชิ้น
@@ -962,48 +1017,7 @@ function AdminPanel({onClose}){
         )}
         {tab==="orders" && (orders.length===0 ? <p style={{textAlign:"center",color:"#9C8A7A",padding:"30px 0"}}>ยังไม่มีออเดอร์</p> :
           [...orders].reverse().map(o=>(
-            <div key={o.code} className="card" style={{marginBottom:12}}>
-              <p className="mono" style={{color:"var(--coral)",fontWeight:700,margin:0}}>{o.code}</p>
-              <p style={{margin:"2px 0",fontSize:14}}>{o.name}</p>
-              <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>{o.fulfil}{o.note ? " · "+o.note : ""}</p>
-              <div style={{fontSize:13,margin:"8px 0"}}>
-                {o.items.map((it,i)=><div key={i}>{it.productName} ({it.variantLabel}) × {it.qty}</div>)}
-              </div>
-              {o.slipImage && (
-                <div style={{margin:"8px 0"}}>
-                  <p style={{fontSize:12,color:"#7A6A5C",marginBottom:4}}>สลิปโอนเงิน · ยอดที่ต้องได้รับ {baht(o.total)}฿</p>
-                  <img src={o.slipImage} alt="สลิป" style={{width:120,borderRadius:8,cursor:"pointer",border:"1px solid #F3E6D3"}} onClick={()=>window.open(o.slipImage,"_blank")}/>
-                  {o.slipDuplicateOf && (
-                    <p style={{color:"var(--coral)",fontSize:12,fontWeight:700,marginTop:6}}>⚠️ สลิปนี้ตรงกับออเดอร์ {o.slipDuplicateOf} เป๊ะ ตรวจสอบก่อนว่าไม่ใช่สลิปซ้ำ</p>
-                  )}
-                </div>
-              )}
-              {o.lotteryResult && (
-                <div style={{display:"flex",alignItems:"center",gap:8,margin:"6px 0",fontSize:13}}>
-                  <span>🎰 รางวัล: <b>{o.lotteryResult}</b></span>
-                  <button
-                    className="pill"
-                    style={o.lotteryUsed ? {} : {background:"var(--mustard)",borderColor:"var(--mustard)",color:"#fff"}}
-                    onClick={()=>setLotteryUsed(o.code, !o.lotteryUsed)}
-                  >
-                    {o.lotteryUsed ? "✓ ใช้แล้ว" : "ยังไม่ใช้"}
-                  </button>
-                </div>
-              )}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span className="mono" style={{fontWeight:700}}>{baht(o.total)}฿</span>
-                <div style={{display:"flex",gap:6}}>
-                  {["ใหม่","กำลังทำ","เสร็จแล้ว"].map(s=>(
-                    <Pill key={s} active={o.status===s} onClick={()=>setOrderStatus(o.code,s)}>{s}</Pill>
-                  ))}
-                </div>
-              </div>
-              {o.userId && (
-                <button className="pill" style={{width:"100%",marginTop:8}} onClick={()=>grantMascotFood(o.userId, 3)}>
-                  🎁 แจกอาหารมาสคอต +3 ให้ลูกค้าคนนี้
-                </button>
-              )}
-            </div>
+            <OrderCard key={o.code} o={o} setOrderStatus={setOrderStatus} setLotteryUsed={setLotteryUsed} grantMascotFood={grantMascotFood}/>
           ))
         )}
       </div>
