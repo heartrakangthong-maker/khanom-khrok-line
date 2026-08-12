@@ -89,6 +89,7 @@ function MascotCard({userId}){
   const [foodPos,setFoodPos] = useState(null); // {x,y} relative to stageRef, or null if not spawned
   const [dragging,setDragging] = useState(false);
   const [mouthOpen,setMouthOpen] = useState(false);
+  const [showDragHint,setShowDragHint] = useState(false);
   const stageRef = React.useRef(null);
   const foodPosRef = React.useRef(null);
   useEffect(()=>{ foodPosRef.current = foodPos; },[foodPos]);
@@ -140,6 +141,8 @@ function MascotCard({userId}){
   const spawnFood = () => {
     if (!data?.canFeed || foodPos) return;
     setFoodPos({...BOX});
+    setShowDragHint(true);
+    setTimeout(()=>setShowDragHint(false), 2500);
   };
 
   const getRelPos = (e) => {
@@ -150,6 +153,7 @@ function MascotCard({userId}){
   const onFoodPointerDown = (e) => {
     e.preventDefault();
     setDragging(true);
+    setShowDragHint(false);
   };
 
   useEffect(() => {
@@ -252,6 +256,15 @@ function MascotCard({userId}){
               ))}
             </div>
           )}
+
+          {/* patting hand */}
+          {patting && (
+            <div style={{
+              position:"absolute", top:-14, left:"50%",
+              fontSize:30, transformOrigin:"70% 0%",
+              animation:"hand-pat .9s ease-in-out",
+            }}>🤚</div>
+          )}
         </div>
 
         {/* food box */}
@@ -264,6 +277,7 @@ function MascotCard({userId}){
             border:"2px solid var(--plum)", display:"flex",alignItems:"center",justifyContent:"center",
             fontSize:18, cursor: data.canFeed && !foodPos ? "pointer" : "default",
             boxShadow:"0 3px 6px rgba(0,0,0,.2)",
+            animation: data.canFeed && !foodPos ? "box-nudge 1.6s ease-in-out infinite" : "none",
           }}
         >
           🎁
@@ -271,6 +285,22 @@ function MascotCard({userId}){
             <span className="mono" style={{position:"absolute",bottom:-8,right:-8,background:"var(--coral)",color:"#fff",fontSize:10,fontWeight:700,borderRadius:999,padding:"1px 6px"}}>{data.foodInventory}</span>
           )}
         </div>
+        <p style={{position:"absolute", top:206, left:"50%", transform:"translateX(-50%)", fontSize:10, color:"#9C8A7A", whiteSpace:"nowrap", margin:0}}>
+          👆 กล่องอาหาร
+        </p>
+
+        {/* drag-teaching popup */}
+        {showDragHint && foodPos && (
+          <div style={{
+            position:"absolute", top:BOX.y-52, left:"50%", transform:"translateX(-50%)",
+            background:"var(--plum)", color:"#fff", fontSize:11, fontWeight:600,
+            padding:"6px 10px", borderRadius:10, whiteSpace:"nowrap", zIndex:15,
+            animation:"hint-fade 2.5s ease-in-out forwards",
+          }}>
+            ลากอาหารไปป้อนปากมาสคอตได้เลย! 👆
+            <div style={{position:"absolute", bottom:-5, left:"50%", width:10, height:10, background:"var(--plum)", transform:"translateX(-50%) rotate(45deg)"}}/>
+          </div>
+        )}
 
         {/* draggable food token */}
         {foodPos && (
@@ -329,6 +359,17 @@ function MascotCard({userId}){
         @keyframes bubble-rise { 0%{ transform: translateY(0) scale(.6); opacity:0;} 15%{ opacity:1;} 100%{ transform: translateY(-140px) scale(1); opacity:0;} }
         @keyframes heart-rise { 0%{ transform: translateY(0) scale(.5); opacity:0;} 20%{ opacity:1;} 100%{ transform: translateY(-46px) scale(1.1); opacity:0;} }
         @keyframes mouth-pop { 0%{ transform: translateX(-50%) scale(.5); opacity:0;} 100%{ transform: translateX(-50%) scale(1); opacity:1;} }
+        @keyframes box-nudge { 0%,100%{ transform: translateX(-50%) rotate(0deg);} 50%{ transform: translateX(-50%) rotate(-6deg);} }
+        @keyframes hint-fade { 0%{ opacity:0; transform: translateX(-50%) translateY(4px);} 10%{ opacity:1; transform: translateX(-50%) translateY(0);} 85%{ opacity:1;} 100%{ opacity:0;} }
+        @keyframes hand-pat {
+          0%,100% { transform: translateX(-50%) translateY(0) rotate(-15deg); opacity:0; }
+          8% { opacity:1; }
+          25% { transform: translateX(-50%) translateY(16px) rotate(-15deg); }
+          40% { transform: translateX(-50%) translateY(0) rotate(-15deg); }
+          55% { transform: translateX(-50%) translateY(16px) rotate(-15deg); }
+          70% { transform: translateX(-50%) translateY(0) rotate(-15deg); }
+          92% { opacity:1; }
+        }
       `}</style>
     </div>
   );
