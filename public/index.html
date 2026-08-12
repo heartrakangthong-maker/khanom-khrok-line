@@ -80,6 +80,77 @@ function Thumb({product}){
   return <div className="thumb">{product.emoji || "🍽️"}</div>;
 }
 
+function MascotCard({userId}){
+  const [data,setData] = useState(null);
+  const [feeding,setFeeding] = useState(false);
+  const [justFed,setJustFed] = useState(false);
+
+  const load = () => {
+    if (!userId) return;
+    fetch(`${API_BASE}/api/mascot/${userId}`, {cache:"no-store"}).then(r=>r.json()).then(setData).catch(()=>{});
+  };
+  useEffect(load, [userId]);
+
+  const feed = async () => {
+    if (feeding || !data?.canFeed) return;
+    setFeeding(true);
+    try {
+      await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
+      setJustFed(true);
+      setTimeout(()=>{ setJustFed(false); load(); }, 700);
+    } finally {
+      setFeeding(false);
+    }
+  };
+
+  if (!data) return null;
+  const progress = data.nextAt ? Math.min(100, (data.orderCount/data.nextAt)*100) : 100;
+  return (
+    <div className="card" style={{marginBottom:12,textAlign:"center"}}>
+      <div style={{width:120,height:120,margin:"0 auto",animation:"mascot-bob 2.4s ease-in-out infinite"}}>
+        <img
+          src={data.image}
+          alt={data.stageName}
+          style={{
+            width:"100%", height:"100%", objectFit:"contain",
+            transform: justFed ? "scale(1.12)" : "scale(1)",
+            transition:"transform .25s cubic-bezier(.34,1.56,.64,1)",
+          }}
+        />
+      </div>
+      <p className="mitr" style={{margin:"4px 0 2px",fontSize:15,fontWeight:700}}>{data.stageName}</p>
+      <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 10px"}}>
+        {data.nextAt ? `สั่งอีก ${data.nextAt - data.orderCount} ครั้ง จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
+      </p>
+      <div style={{height:8,background:"var(--cream-deep)",borderRadius:999,overflow:"hidden",marginBottom:12}}>
+        <div style={{height:"100%",width:`${progress}%`,background:"var(--leaf)",borderRadius:999,transition:"width .4s"}}/>
+      </div>
+      {data.canFeed && (
+        <button className="btn-teal" style={{background: justFed ? "var(--leaf)" : "var(--teal)"}} disabled={feeding} onClick={feed}>
+          {justFed ? "อร่อยมาก! 😋" : `🍽️ ให้อาหารมาสคอต${data.unfed>1 ? ` (${data.unfed})` : ""}`}
+        </button>
+      )}
+      <style>{`
+        @keyframes mascot-bob { 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(-6px) rotate(-2deg);} }
+      `}</style>
+    </div>
+  );
+}
+
+function MascotScreen({userId,onClose}){
+  return (
+    <div style={{position:"fixed",inset:0,background:"#fff",zIndex:35,display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 16px",borderBottom:"1px solid #F3E6D3"}}>
+        <h2 className="mitr" style={{margin:0,fontSize:16}}>มาสคอตของฉัน</h2>
+        <button onClick={onClose}>✕</button>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:16}}>
+        <MascotCard userId={userId}/>
+      </div>
+    </div>
+  );
+}
+
 function ProductCard({product,onAdd}){
   const [variantId,setVariantId] = useState(product.variants[0]?.id);
   const [qty,setQty] = useState(1);
@@ -721,6 +792,7 @@ function App(){
   const [lastOrder,setLastOrder] = useState(null);
   const [submitting,setSubmitting] = useState(false);
   const [adminOpen,setAdminOpen] = useState(false);
+  const [mascotOpen,setMascotOpen] = useState(false);
   const [settings,setSettings] = useState(null);
 
   useEffect(() => {
@@ -782,12 +854,18 @@ function App(){
             <h1 className="mitr" style={{margin:"2px 0 0",fontSize:24}}>ขนมครกสิงคโปร์</h1>
             <p style={{margin:"4px 0 0",fontSize:12,opacity:.85}}>สดใหม่ทุกออเดอร์ · เลือกเมนูแล้วยืนยันได้เลย</p>
           </div>
-          <button onClick={()=>setAdminOpen(true)} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.15)",color:"#fff"}}>⚙</button>
+          <div style={{display:"flex",gap:8}}>
+            {profile?.userId && (
+              <button onClick={()=>setMascotOpen(true)} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.15)",color:"#fff",fontSize:17}}>🐣</button>
+            )}
+            <button onClick={()=>setAdminOpen(true)} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.15)",color:"#fff"}}>⚙</button>
+          </div>
         </div>
       </div>
 
       {screen==="shop" && (
         <div style={{padding:"12px 16px 110px"}}>
+          {profile?.userId && <MascotCard userId={profile.userId}/>}
           {catalog.map(p=><ProductCard key={p.id} product={p} onAdd={addToCart}/>)}
         </div>
       )}
@@ -814,6 +892,8 @@ function App(){
       <CartDrawer open={cartOpen} onClose={()=>setCartOpen(false)} cart={cart}
         onQtyChange={changeQty} onRemove={removeItem} total={total}
         onCheckout={()=>{setCartOpen(false);setScreen("checkout");}}/>
+
+      {mascotOpen && profile?.userId && <MascotScreen userId={profile.userId} onClose={()=>setMascotOpen(false)}/>}
 
       {adminOpen && <AdminPanel onClose={()=>{
         setAdminOpen(false);
