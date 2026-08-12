@@ -204,92 +204,188 @@ function CheckoutScreen({cart,total,profile,onBack,onConfirm,submitting}){
   );
 }
 
-const BALL_POS = [
-  { top: 8, left: 55 }, { top: 30, left: 15 }, { top: 30, left: 95 },
-  { top: 60, left: 35 }, { top: 60, left: 75 }, { top: 85, left: 55 },
+// [topColor, bottomColor] pairs — real gashapon capsules: pale cap on top, colored base on bottom
+const BALL_PAIRS = [
+  ["var(--cream)","var(--coral)"], ["var(--cream)","var(--mustard)"], ["var(--cream)","var(--teal)"],
+  ["var(--cream)","var(--leaf)"], ["#fff","#B24A9E"], ["#fff","#3D7FBF"], ["var(--cream)","#8C7C64"],
+  ["#fff","var(--coral)"], ["var(--cream)","#0E4E50"], ["#fff","var(--mustard)"],
 ];
-const BALL_COLORS = ["var(--teal)","var(--coral)","var(--mustard)","#8C7C64","var(--leaf)","#0E4E50"];
+// balls piled up by gravity toward the bottom of the round window — top of the dome stays empty glass
+const WINDOW_BALLS = [
+  { top: 40, left: 30, size: 22 }, { top: 38, left: 50, size: 24 }, { top: 42, left: 68, size: 20 },
+  { top: 52, left: 16, size: 22 }, { top: 50, left: 38, size: 26 }, { top: 54, left: 58, size: 24 },
+  { top: 52, left: 78, size: 20 }, { top: 64, left: 22, size: 24 }, { top: 66, left: 44, size: 26 },
+  { top: 64, left: 64, size: 22 }, { top: 68, left: 82, size: 18 }, { top: 78, left: 30, size: 22 },
+  { top: 80, left: 52, size: 24 }, { top: 78, left: 70, size: 18 }, { top: 90, left: 40, size: 20 },
+  { top: 91, left: 58, size: 18 }, { top: 70, left: 8, size: 18 }, { top: 82, left: 18, size: 20 },
+  { top: 58, left: 6, size: 18 },
+];
+
+function GachaBall({top,bottom,style}){
+  return (
+    <div style={{position:"relative",borderRadius:"50%",overflow:"hidden",boxShadow:"0 2px 4px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,0,0,.15)",...style}}>
+      <div style={{position:"absolute",inset:0,background:`linear-gradient(to bottom, ${top} 0%, ${top} 48%, ${bottom} 52%, ${bottom} 100%)`}}/>
+      <div style={{position:"absolute",top:"10%",left:"16%",width:"38%",height:"26%",borderRadius:"50%",background:"rgba(255,255,255,.8)"}}/>
+      <div style={{position:"absolute",inset:0,borderRadius:"50%",boxShadow:"inset -3px -4px 5px rgba(0,0,0,.28)"}}/>
+    </div>
+  );
+}
+
+function useGachaSound(){
+  const ctxRef = React.useRef(null);
+  const getCtx = () => {
+    if (!ctxRef.current) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctxRef.current = new AC();
+    }
+    if (ctxRef.current.state === "suspended") ctxRef.current.resume();
+    return ctxRef.current;
+  };
+  const beep = (freq,duration,type,startOffset,gainVal) => {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.connect(g); g.connect(ctx.destination);
+    const t = ctx.currentTime + startOffset;
+    g.gain.setValueAtTime(gainVal, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.start(t); osc.stop(t + duration);
+  };
+  const playShake = () => { getCtx(); for (let i=0;i<13;i++) beep(280+Math.random()*160, 0.06, "square", i*0.2, 0.06); };
+  const playDrop = () => {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sine";
+    const t = ctx.currentTime;
+    osc.frequency.setValueAtTime(520, t);
+    osc.frequency.exponentialRampToValueAtTime(110, t + 0.45);
+    g.gain.setValueAtTime(0.14, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.45);
+  };
+  const playChime = () => { [523.25,659.25,783.99,1046.5].forEach((f,i)=>beep(f,0.35,"triangle",i*0.09,0.11)); };
+  return { playShake, playDrop, playChime };
+}
 
 function LotterySection({orderCode}){
-  const [phase,setPhase] = useState("idle"); // idle | shaking | dropping | revealed | error
+  const [phase,setPhase] = useState("idle"); // idle | shaking | falling | landed | opening | revealed | error
   const [prize,setPrize] = useState(null);
-  const [winnerIdx,setWinnerIdx] = useState(null);
+  const [winner,setWinner] = useState(null);
+  const [runId,setRunId] = useState(0);
+  const sound = useGachaSound();
 
   const draw = () => {
     if (phase!=="idle") return;
+    const idx = Math.floor(Math.random()*WINDOW_BALLS.length);
+    setWinner(idx);
     setPhase("shaking");
-    const idx = Math.floor(Math.random()*6);
+    sound.playShake();
     fetch(`${API_BASE}/api/lottery/${orderCode}`, { method:"POST" })
       .then(r=>{ if(!r.ok) throw new Error("fail"); return r.json(); })
       .then(data=>{
+        setTimeout(()=>{ setPhase("falling"); sound.playDrop(); }, 2600);
+        setTimeout(()=>setPhase("landed"), 2600+700);
+        setTimeout(()=>setPhase("opening"), 2600+700+450);
         setTimeout(()=>{
-          setWinnerIdx(idx);
-          setPhase("dropping");
-          setTimeout(()=>{ setPrize(data.prize); setPhase("revealed"); }, 750);
-        }, 3000);
+          setPrize(data.prize);
+          setPhase("revealed");
+          setRunId(k=>k+1);
+          sound.playChime();
+        }, 2600+700+450+500);
       })
-      .catch(()=> setTimeout(()=>setPhase("error"), 3000));
+      .catch(()=> setTimeout(()=>setPhase("error"), 2600));
   };
+
+  const pair = BALL_PAIRS[winner!==null ? winner % BALL_PAIRS.length : 0];
+  const ballColor = pair[1];
 
   return (
     <div className="card" style={{marginTop:16,textAlign:"center"}}>
       <p className="mitr" style={{fontSize:15,fontWeight:700,margin:"0 0 4px"}}>🎰 จับสลากลุ้นรางวัล</p>
       <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 14px"}}>เล่นได้ 1 ครั้งต่อออเดอร์เท่านั้น</p>
 
-      <div style={{position:"relative",width:150,height:150,margin:"0 auto"}}>
-        <div style={{
-          position:"absolute",inset:0,borderRadius:"50%",
-          background:"radial-gradient(circle at 35% 30%, rgba(255,255,255,0.6), rgba(255,255,255,0.05) 55%)",
-          border:"3px solid var(--plum)",
-          boxShadow:"inset 0 0 20px rgba(58,34,51,0.15), 0 10px 18px -10px rgba(58,34,51,.4)",
-          overflow:"hidden",
-          animation: phase==="shaking" ? "sk-shakebox .18s infinite" : "none",
-        }}>
-          {BALL_POS.map((pos,i)=>{
-            const isWinner = winnerIdx===i;
-            const hideOthers = (phase==="dropping"||phase==="revealed") && !isWinner;
+      <div style={{position:"relative",width:190,height:280,margin:"0 auto"}}>
+        <svg viewBox="0 0 190 280" width={190} height={280} style={{position:"absolute",top:0,left:0}}>
+          <rect x="35" y="280" width="14" height="14" rx="3" fill="var(--plum)"/>
+          <rect x="151" y="280" width="14" height="14" rx="3" fill="var(--plum)"/>
+          <rect x="18" y="60" width="164" height="222" rx="16" fill="var(--coral)" stroke="var(--plum)" strokeWidth="3"/>
+          <path d="M28,60 Q100,20 172,60 Z" fill="var(--mustard)" stroke="var(--plum)" strokeWidth="3" strokeLinejoin="round"/>
+          <circle cx="100" cy="118" r="60" fill="var(--plum)"/>
+          <circle cx="100" cy="118" r="55" fill="var(--cream-deep)" stroke="var(--plum)" strokeWidth="3"/>
+          <rect x="34" y="186" width="132" height="24" rx="6" fill="var(--plum)"/>
+          <text x="100" y="202" textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--cream)" fontFamily="Mitr, sans-serif">สุ่มรางวัล</text>
+          <rect x="34" y="222" width="26" height="8" rx="4" fill="var(--plum)"/>
+          <rect x="72" y="248" width="56" height="30" rx="8" fill="var(--plum)"/>
+          <rect x="78" y="253" width="44" height="20" rx="6" fill="#1c1220"/>
+        </svg>
+
+        <div style={{position:"absolute",top:108,left:168,width:26,height:26,transformOrigin:"50% 50%",animation: phase==="shaking" ? "gm-crank .5s linear infinite" : "none"}}>
+          <div style={{position:"absolute",top:10,left:-14,width:22,height:6,background:"var(--plum)",borderRadius:3}}/>
+          <div style={{width:26,height:26,borderRadius:"50%",background:"radial-gradient(circle at 30% 25%, #fff8, var(--mustard) 60%)",border:"2.5px solid var(--plum)"}}/>
+        </div>
+
+        <div style={{position:"absolute",top:63,left:45,width:110,height:110,borderRadius:"50%",overflow:"hidden"}}>
+          {WINDOW_BALLS.map((b,i)=>{
+            const isWinner = i===winner;
+            const hide = phase!=="idle" && phase!=="shaking" && isWinner;
+            const p = BALL_PAIRS[i%BALL_PAIRS.length];
             return (
-              <div key={i} style={{
-                position:"absolute", top:`${pos.top}%`, left:`${pos.left}%`,
-                width:32, height:32, marginLeft:-16, marginTop:-16, borderRadius:"50%",
-                background:`radial-gradient(circle at 35% 30%, #fff5, ${BALL_COLORS[i%BALL_COLORS.length]} 60%)`,
-                color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:12, fontWeight:800, boxShadow:"0 2px 4px rgba(0,0,0,.25)",
-                opacity: hideOthers?0:1,
-                transition:"opacity .25s, transform .6s cubic-bezier(.34,1.56,.64,1)",
-                animation: phase==="idle" ? `sk-float 2.4s ease-in-out ${i*0.15}s infinite`
-                  : phase==="shaking" ? `sk-jitter .22s linear ${i*0.05}s infinite` : "none",
-                transform: (phase==="dropping"||phase==="revealed") && isWinner ? "translateY(140px) scale(1.15)" : "translateY(0) scale(1)",
-                zIndex: isWinner?5:1,
-              }}>{i+1}</div>
+              <GachaBall key={i} top={p[0]} bottom={p[1]} style={{
+                position:"absolute", top:`${b.top}%`, left:`${b.left}%`,
+                width:b.size, height:b.size,
+                opacity: hide?0:1, transition:"opacity .2s",
+                animation: phase==="shaking" ? `gm-jitter .18s linear ${(i*0.05)%0.3}s infinite` : "none",
+              }}/>
             );
           })}
         </div>
-        <div style={{position:"absolute",bottom:-8,left:"50%",transform:"translateX(-50%)",width:18,height:12,background:"var(--plum)",borderRadius:"0 0 6px 6px"}}/>
-      </div>
 
-      <div style={{marginTop:28,width:64,height:64,borderRadius:"50%",border:`2px dashed ${phase==="revealed"?"var(--coral)":"#D9C9AE"}`,display:"flex",alignItems:"center",justifyContent:"center",background:phase==="revealed"?"#fff":"transparent",marginLeft:"auto",marginRight:"auto"}}>
-        {phase==="revealed" && winnerIdx!==null && (
-          <div style={{width:40,height:40,borderRadius:"50%",background:`radial-gradient(circle at 35% 30%, #fff5, ${BALL_COLORS[winnerIdx%BALL_COLORS.length]} 60%)`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,animation:"sk-pop .4s cubic-bezier(.34,1.56,.64,1)"}}>{winnerIdx+1}</div>
+        {phase==="falling" && winner!==null && (
+          <GachaBall top={pair[0]} bottom={pair[1]} style={{
+            position:"absolute", top:150, left:100, width:20, height:20, marginLeft:-10,
+            animation:"gm-drop .75s cubic-bezier(.55,0,.85,.4) forwards",
+          }}/>
+        )}
+
+        {(phase==="landed"||phase==="opening"||phase==="revealed") && (
+          <div style={{position:"absolute",top:238,left:"50%",transform:"translateX(-50%)",width:76,height:50}}>
+            <div style={{position:"relative",width:"100%",height:"100%"}}>
+              <div style={{position:"absolute",bottom:0,left:"50%",transform:"translateX(-50%)",width:46,height:23,borderRadius:"0 0 23px 23px",background:`linear-gradient(${ballColor}, var(--plum))`,boxShadow:"0 4px 10px rgba(0,0,0,.35)",animation: phase==="landed" ? "gm-squash .3s ease" : "none"}}/>
+              <div style={{position:"absolute",bottom:20,left:"50%",width:46,height:23,borderRadius:"23px 23px 0 0",background:`linear-gradient(var(--cream), ${ballColor})`,boxShadow:"0 -2px 6px rgba(0,0,0,.2)",transformOrigin:"50% 100%",transform: (phase==="opening"||phase==="revealed") ? "translateX(-50%) rotate(-135deg) translateY(-4px)" : "translateX(-50%) rotate(0deg)",transition:"transform .5s cubic-bezier(.34,1.56,.64,1)"}}/>
+              {(phase==="opening"||phase==="revealed") && (
+                <div style={{position:"absolute",bottom:12,left:"50%",transform:"translateX(-50%)",width:36,height:36,borderRadius:"50%",background:"radial-gradient(circle, rgba(255,244,190,.9), rgba(255,244,190,0) 65%)",animation:"gm-shine .6s ease-out"}}/>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
-      <div style={{height:14}}/>
+      <div style={{height:8}}/>
       {phase==="error" ? (
         <p style={{color:"var(--coral)",fontSize:12}}>จับสลากไม่สำเร็จ ลองใหม่อีกครั้ง</p>
       ) : phase!=="revealed" ? (
         <button className="btn-teal" style={{background: phase!=="idle" ? "#C9BBA5" : "var(--coral)"}} disabled={phase!=="idle"} onClick={draw}>
-          {phase==="idle" ? "จับสลากเลย!" : phase==="shaking" ? "กำลังเขย่า..." : "กำลังออกลูก..."}
+          {phase==="idle" ? "หมุนไขเลย!" : phase==="shaking" ? "กำลังหมุน..." : phase==="falling" ? "ลูกบอลกำลังไหลลง..." : "กำลังเปิดแคปซูล..."}
         </button>
       ) : (
         <p className="mitr" style={{fontSize:16,fontWeight:700,color:"var(--teal)"}}>🎉 ได้รับ: {prize}</p>
       )}
 
       <style>{`
-        @keyframes sk-float { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-6px);} }
-        @keyframes sk-jitter { 0%{ transform: translate(0,0);} 25%{ transform: translate(3px,-4px);} 50%{ transform: translate(-4px,3px);} 75%{ transform: translate(4px,4px);} 100%{ transform: translate(0,0);} }
-        @keyframes sk-shakebox { 0%{ transform: translate(0,0) rotate(0);} 25%{ transform: translate(1px,-1px) rotate(-1deg);} 50%{ transform: translate(-1px,1px) rotate(1deg);} 75%{ transform: translate(1px,1px) rotate(-1deg);} 100%{ transform: translate(0,0) rotate(0);} }
-        @keyframes sk-pop { 0%{ transform: scale(0); opacity:0;} 70%{ transform: scale(1.15); opacity:1;} 100%{ transform: scale(1);} }
+        @keyframes gm-jitter { 0%{ transform: translate(0,0);} 25%{ transform: translate(2px,-3px);} 50%{ transform: translate(-3px,2px);} 75%{ transform: translate(2px,2px);} 100%{ transform: translate(0,0);} }
+        @keyframes gm-crank { 0%{ transform: rotate(0deg);} 100%{ transform: rotate(360deg);} }
+        @keyframes gm-drop {
+          0%{ top:150px; transform: translateX(-50%) scale(1); }
+          70%{ top:242px; transform: translateX(-50%) scale(1); }
+          85%{ top:228px; transform: translateX(-50%) scale(1.05,.9); }
+          100%{ top:242px; transform: translateX(-50%) scale(1); opacity:0; }
+        }
+        @keyframes gm-squash { 0%{ transform: translateX(-50%) scale(1,.6);} 60%{ transform: translateX(-50%) scale(1.1,.85);} 100%{ transform: translateX(-50%) scale(1,1);} }
+        @keyframes gm-shine { 0%{ opacity:0; transform: translateX(-50%) scale(.3);} 40%{ opacity:1; transform: translateX(-50%) scale(1.4);} 100%{ opacity:0; transform: translateX(-50%) scale(1.8);} }
       `}</style>
     </div>
   );
