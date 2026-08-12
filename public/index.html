@@ -82,7 +82,7 @@ function Thumb({product}){
 
 function MascotCard({userId}){
   const [data,setData] = useState(null);
-  const [feeding,setFeeding] = useState(false);
+  const [redeeming,setRedeeming] = useState(false);
   const [justFed,setJustFed] = useState(false);
 
   const load = () => {
@@ -91,20 +91,22 @@ function MascotCard({userId}){
   };
   useEffect(load, [userId]);
 
-  const feed = async () => {
-    if (feeding || !data?.canFeed) return;
-    setFeeding(true);
+  const redeem = async () => {
+    if (redeeming || !data?.canRedeem) return;
+    setRedeeming(true);
     try {
-      await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
+      await fetch(`${API_BASE}/api/mascot/${userId}/redeem`, { method:"POST" });
       setJustFed(true);
       setTimeout(()=>{ setJustFed(false); load(); }, 700);
     } finally {
-      setFeeding(false);
+      setRedeeming(false);
     }
   };
 
   if (!data) return null;
-  const progress = data.nextAt ? Math.min(100, (data.orderCount/data.nextAt)*100) : 100;
+  const progress = data.nextThreshold
+    ? Math.min(100, ((data.foodGiven-data.stageStart)/(data.nextThreshold-data.stageStart))*100)
+    : 100;
   return (
     <div className="card" style={{marginBottom:12,textAlign:"center"}}>
       <div style={{width:120,height:120,margin:"0 auto",animation:"mascot-bob 2.4s ease-in-out infinite"}}>
@@ -119,15 +121,19 @@ function MascotCard({userId}){
         />
       </div>
       <p className="mitr" style={{margin:"4px 0 2px",fontSize:15,fontWeight:700}}>{data.stageName}</p>
-      <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 10px"}}>
-        {data.nextAt ? `สั่งอีก ${data.nextAt - data.orderCount} ครั้ง จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
+      <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 4px"}}>
+        {data.nextThreshold ? `อาหารแล้ว ${data.foodGiven}/${data.nextThreshold} ชิ้น จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
       </p>
-      <div style={{height:8,background:"var(--cream-deep)",borderRadius:999,overflow:"hidden",marginBottom:12}}>
+      <div style={{height:8,background:"var(--cream-deep)",borderRadius:999,overflow:"hidden",margin:"0 0 14px"}}>
         <div style={{height:"100%",width:`${progress}%`,background:"var(--leaf)",borderRadius:999,transition:"width .4s"}}/>
       </div>
-      {data.canFeed && (
-        <button className="btn-teal" style={{background: justFed ? "var(--leaf)" : "var(--teal)"}} disabled={feeding} onClick={feed}>
-          {justFed ? "อร่อยมาก! 😋" : `🍽️ ให้อาหารมาสคอต${data.unfed>1 ? ` (${data.unfed})` : ""}`}
+      <div className="card" style={{background:"var(--cream)",boxShadow:"none",padding:12,marginBottom:12}}>
+        <p style={{fontSize:13,margin:0}}>แต้มของคุณ: <b className="mono" style={{color:"var(--coral)"}}>{data.availablePoints}</b> แต้ม</p>
+        <p style={{fontSize:11,color:"#9C8A7A",margin:"2px 0 0"}}>ทุก 100฿ ในบิลได้ 1 แต้ม · ใช้ {data.pointsPerFood} แต้มแลกอาหาร 1 ชิ้น</p>
+      </div>
+      {data.nextThreshold && (
+        <button className="btn-teal" style={{background: justFed ? "var(--leaf)" : (data.canRedeem ? "var(--teal)" : "#C9BBA5")}} disabled={redeeming || !data.canRedeem} onClick={redeem}>
+          {justFed ? "อร่อยมาก! 😋" : `🍽️ แลกแต้มเป็นอาหาร (ใช้ ${data.pointsPerFood} แต้ม)`}
         </button>
       )}
       <style>{`
@@ -547,7 +553,7 @@ function AdminPanel({onClose}){
   const [orders,setOrders] = useState([]);
   const [tab,setTab] = useState("menu");
   const [error,setError] = useState("");
-  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:"",faqs:[],lottery:[]});
+  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:"",faqs:[],lottery:[],pointsPerFood:3});
 
   const unlock = async () => {
     const res = await fetch(`${API_BASE}/api/orders`, { headers: { "x-admin-passcode": passcode }, cache:"no-store" });
@@ -645,6 +651,7 @@ function AdminPanel({onClose}){
         <Pill active={tab==="pay"} onClick={()=>setTab("pay")}>การชำระเงิน</Pill>
         <Pill active={tab==="faq"} onClick={()=>setTab("faq")}>คำถามที่พบบ่อย</Pill>
         <Pill active={tab==="lottery"} onClick={()=>setTab("lottery")}>รางวัลสุ่ม</Pill>
+        <Pill active={tab==="mascot"} onClick={()=>setTab("mascot")}>มาสคอต</Pill>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 32px"}}>
         {tab==="menu" && catalog.map(p=>(
@@ -681,6 +688,21 @@ function AdminPanel({onClose}){
             <label style={{fontSize:12,color:"#7A6A5C"}}>ชื่อบัญชี/พร้อมเพย์</label>
             <input type="text" value={paySettings.accountName} onChange={e=>savePaySettings({...paySettings,accountName:e.target.value})}/>
             {paySettings.qrImage && <img src={paySettings.qrImage} alt="QR" style={{width:160,marginTop:12}}/>}
+          </div>
+        )}
+        {tab==="mascot" && (
+          <div className="card">
+            <label style={{fontSize:12,color:"#7A6A5C"}}>แต้มที่ใช้แลกอาหาร 1 ชิ้น</label>
+            <input type="number" min="1" value={paySettings.pointsPerFood||1} onChange={e=>{
+              const next = {...paySettings, pointsPerFood: Math.max(1, Number(e.target.value)||1)};
+              savePaySettings(next);
+            }} style={{marginTop:6,marginBottom:10}}/>
+            <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>
+              ลูกค้าได้ 1 แต้มทุกๆ 100฿ ในบิลที่จ่ายเงินแล้ว ใช้ <b>{paySettings.pointsPerFood||1}</b> แต้ม แลกอาหารมาสคอตได้ 1 ชิ้น
+            </p>
+            <p style={{fontSize:11,color:"#9C8A7A",marginTop:8}}>
+              ด่านการเติบโต (คงที่ ไม่ต้องตั้ง): ร่าง 1→2 ใช้ 5 ชิ้น · 2→3 ใช้ 5 ชิ้น · 3→4 ใช้ 10 ชิ้น · 4→5 ใช้ 20 ชิ้น
+            </p>
           </div>
         )}
         {tab==="lottery" && (
@@ -793,6 +815,7 @@ function App(){
   const [submitting,setSubmitting] = useState(false);
   const [adminOpen,setAdminOpen] = useState(false);
   const [mascotOpen,setMascotOpen] = useState(false);
+  const [showMascotHint,setShowMascotHint] = useState(false);
   const [settings,setSettings] = useState(null);
 
   useEffect(() => {
@@ -804,6 +827,13 @@ function App(){
     const interval = setInterval(loadData, 15000); // รีเฟรชเมนู/ราคาอัตโนมัติทุก 15 วินาที
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!ready || !profile?.userId) return;
+    const showT = setTimeout(() => setShowMascotHint(true), 900);
+    const hideT = setTimeout(() => setShowMascotHint(false), 900 + 4000);
+    return () => { clearTimeout(showT); clearTimeout(hideT); };
+  }, [ready, profile?.userId]);
 
   const addToCart = useCallback((product,variant,qty) => {
     setCart(prev => {
@@ -854,18 +884,34 @@ function App(){
             <h1 className="mitr" style={{margin:"2px 0 0",fontSize:24}}>ขนมครกสิงคโปร์</h1>
             <p style={{margin:"4px 0 0",fontSize:12,opacity:.85}}>สดใหม่ทุกออเดอร์ · เลือกเมนูแล้วยืนยันได้เลย</p>
           </div>
-          <div style={{display:"flex",gap:8}}>
+          <div style={{display:"flex",gap:8,position:"relative"}}>
             {profile?.userId && (
-              <button onClick={()=>setMascotOpen(true)} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.15)",color:"#fff",fontSize:17}}>🐣</button>
+              <React.Fragment>
+                <button onClick={()=>{setMascotOpen(true);setShowMascotHint(false);}} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.15)",color:"#fff",fontSize:17}}>🐣</button>
+                {showMascotHint && (
+                  <div style={{
+                    position:"absolute", top:44, right:0, zIndex:20,
+                    background:"var(--plum)", color:"#fff", fontSize:12, fontWeight:600,
+                    padding:"8px 12px", borderRadius:12, whiteSpace:"nowrap",
+                    boxShadow:"0 8px 16px -8px rgba(0,0,0,.5)",
+                    animation:"hint-pop .3s cubic-bezier(.34,1.56,.64,1)",
+                  }}>
+                    🐣 เลี้ยงมาสคอตของคุณได้ที่นี่!
+                    <div style={{position:"absolute", top:-6, right:14, width:12, height:12, background:"var(--plum)", transform:"rotate(45deg)"}}/>
+                  </div>
+                )}
+              </React.Fragment>
             )}
             <button onClick={()=>setAdminOpen(true)} style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.15)",color:"#fff"}}>⚙</button>
           </div>
         </div>
+        <style>{`
+          @keyframes hint-pop { 0%{ opacity:0; transform: translateY(-6px) scale(.9);} 100%{ opacity:1; transform: translateY(0) scale(1);} }
+        `}</style>
       </div>
 
       {screen==="shop" && (
         <div style={{padding:"12px 16px 110px"}}>
-          {profile?.userId && <MascotCard userId={profile.userId}/>}
           {catalog.map(p=><ProductCard key={p.id} product={p} onAdd={addToCart}/>)}
         </div>
       )}
