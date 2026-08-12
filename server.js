@@ -291,16 +291,31 @@ app.get('/api/mascot/:userId', (req, res) => {
   const orders = readOrders();
   const totalPoints = calcTotalPoints(orders, req.params.userId);
   const fedData = readMascotFed();
-  const rec = fedData[req.params.userId] || { redeemedPoints: 0, foodGiven: 0 };
+  let rec = fedData[req.params.userId];
+  let changed = false;
+  if (!rec) {
+    rec = { redeemedPoints: 0, foodInventory: 0, foodGiven: 0, lastBathAt: Date.now() };
+    changed = true;
+  }
+  if (rec.foodInventory === undefined) { rec.foodInventory = 0; changed = true; }
+  if (rec.lastBathAt === undefined) { rec.lastBathAt = Date.now(); changed = true; }
+  if (changed) {
+    fedData[req.params.userId] = rec;
+    writeMascotFed(fedData);
+  }
+
   const availablePoints = Math.max(0, totalPoints - rec.redeemedPoints);
   const stage = getMascotStage(rec.foodGiven);
   const stageIdx = MASCOT_STAGES.indexOf(stage);
   const next = MASCOT_STAGES[stageIdx + 1];
   const settings = readSettings();
   const pointsPerFood = Number(settings.pointsPerFood) || 1;
+  const isDirty = Date.now() - rec.lastBathAt >= 3 * 60 * 60 * 1000;
+
   res.json({
     totalPoints,
     availablePoints,
+    foodInventory: rec.foodInventory,
     foodGiven: rec.foodGiven,
     stage: stage.key,
     stageName: stage.name,
@@ -310,6 +325,8 @@ app.get('/api/mascot/:userId', (req, res) => {
     nextThreshold: next ? next.threshold : null,
     foodNeeded: next ? next.threshold - rec.foodGiven : null,
     canRedeem: !!next && availablePoints >= pointsPerFood,
+    canFeed: !!next && rec.foodInventory > 0,
+    isDirty,
   });
 });
 
@@ -317,19 +334,40 @@ app.post('/api/mascot/:userId/redeem', express.json(), (req, res) => {
   const orders = readOrders();
   const totalPoints = calcTotalPoints(orders, req.params.userId);
   const fedData = readMascotFed();
-  const rec = fedData[req.params.userId] || { redeemedPoints: 0, foodGiven: 0 };
+  const rec = fedData[req.params.userId] || { redeemedPoints: 0, foodInventory: 0, foodGiven: 0, lastBathAt: Date.now() };
   const availablePoints = Math.max(0, totalPoints - rec.redeemedPoints);
   const settings = readSettings();
   const pointsPerFood = Number(settings.pointsPerFood) || 1;
+  if (availablePoints >= pointsPerFood) {
+    rec.redeemedPoints += pointsPerFood;
+    rec.foodInventory = (rec.foodInventory || 0) + 1;
+    fedData[req.params.userId] = rec;
+    writeMascotFed(fedData);
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/mascot/:userId/feed', express.json(), (req, res) => {
+  const fedData = readMascotFed();
+  const rec = fedData[req.params.userId] || { redeemedPoints: 0, foodInventory: 0, foodGiven: 0, lastBathAt: Date.now() };
   const stage = getMascotStage(rec.foodGiven);
   const stageIdx = MASCOT_STAGES.indexOf(stage);
   const next = MASCOT_STAGES[stageIdx + 1];
-  if (next && availablePoints >= pointsPerFood) {
-    rec.redeemedPoints += pointsPerFood;
+  if (next && (rec.foodInventory || 0) > 0) {
+    rec.foodInventory -= 1;
     rec.foodGiven += 1;
     fedData[req.params.userId] = rec;
     writeMascotFed(fedData);
   }
+  res.json({ ok: true });
+});
+
+app.post('/api/mascot/:userId/bath', express.json(), (req, res) => {
+  const fedData = readMascotFed();
+  const rec = fedData[req.params.userId] || { redeemedPoints: 0, foodInventory: 0, foodGiven: 0, lastBathAt: Date.now() };
+  rec.lastBathAt = Date.now();
+  fedData[req.params.userId] = rec;
+  writeMascotFed(fedData);
   res.json({ ok: true });
 });
 
@@ -354,8 +392,8 @@ app.post('/api/lottery/:code', express.json(), async (req, res) => {
 
     if (winner.type === 'mascotFood' && order.userId) {
       const fedData = readMascotFed();
-      const rec = fedData[order.userId] || { redeemedPoints: 0, foodGiven: 0 };
-      rec.foodGiven += winner.amount || 1;
+      const rec = fedData[order.userId] || { redeemedPoints: 0, foodInventory: 0, foodGiven: 0, lastBathAt: Date.now() };
+      rec.foodInventory = (rec.foodInventory || 0) + (winner.amount || 1);
       fedData[order.userId] = rec;
       writeMascotFed(fedData);
     }
