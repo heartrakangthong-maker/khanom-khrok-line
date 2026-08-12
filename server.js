@@ -371,6 +371,16 @@ app.post('/api/mascot/:userId/bath', express.json(), (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/mascot/:userId/grant', express.json(), requireAdmin, (req, res) => {
+  const fedData = readMascotFed();
+  const rec = fedData[req.params.userId] || { redeemedPoints: 0, foodInventory: 0, foodGiven: 0, lastBathAt: Date.now() };
+  const amount = Number(req.body.amount) || 1;
+  rec.foodInventory = (rec.foodInventory || 0) + amount;
+  fedData[req.params.userId] = rec;
+  writeMascotFed(fedData);
+  res.json({ ok: true, foodInventory: rec.foodInventory });
+});
+
 app.post('/api/lottery/:code', express.json(), async (req, res) => {
   try {
     const orders = readOrders();
