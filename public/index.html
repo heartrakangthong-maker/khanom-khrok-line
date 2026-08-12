@@ -295,8 +295,9 @@ function LotterySection({orderCode}){
   );
 }
 
-function ConfirmScreen({order,onNewOrder,settings}){
+function ConfirmScreen({order,onNewOrder,settings,onPlayLottery}){
   const [slipStatus,setSlipStatus] = useState("idle"); // idle | uploading | done | error
+  const [showLotteryPopup,setShowLotteryPopup] = useState(false);
   const fileInputRef = React.useRef(null);
 
   const handleSlipUpload = (e) => {
@@ -313,6 +314,7 @@ function ConfirmScreen({order,onNewOrder,settings}){
         });
         if (!res.ok) throw new Error("upload failed");
         setSlipStatus("done");
+        setShowLotteryPopup(true);
       } catch (err) {
         setSlipStatus("error");
       }
@@ -336,10 +338,7 @@ function ConfirmScreen({order,onNewOrder,settings}){
           <input type="file" accept="image/*" ref={fileInputRef} style={{display:"none"}} onChange={handleSlipUpload}/>
           <div style={{marginTop:12}}>
             {slipStatus==="done" ? (
-              <React.Fragment>
-                <p style={{color:"var(--leaf)",fontWeight:600,fontSize:14}}>✓ แนบสลิปแล้ว ขอบคุณครับ</p>
-                <LotterySection orderCode={order.code}/>
-              </React.Fragment>
+              <p style={{color:"var(--leaf)",fontWeight:600,fontSize:14}}>✓ แนบสลิปแล้ว ขอบคุณครับ</p>
             ) : (
               <button className="btn-teal" style={{width:"100%"}} disabled={slipStatus==="uploading"} onClick={()=>fileInputRef.current.click()}>
                 {slipStatus==="uploading" ? "กำลังอัปโหลด..." : "📎 แนบสลิปโอนเงิน"}
@@ -350,6 +349,26 @@ function ConfirmScreen({order,onNewOrder,settings}){
         </div>
       )}
       <button className="btn-teal" style={{marginTop:20}} onClick={onNewOrder}>สั่งเพิ่มอีกออเดอร์</button>
+
+      {showLotteryPopup && (
+        <div className="drawer-overlay" style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div className="card" style={{width:280,textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:6}}>🎰</div>
+            <h3 className="mitr" style={{marginTop:0,fontSize:17}}>คุณได้รับสิทธิ์จับสลาก 1 ครั้ง!</h3>
+            <p style={{fontSize:13,color:"#7A6A5C",marginBottom:16}}>กดตกลงเพื่อไปหมุนลูกบอลลุ้นรางวัลกันเลยครับ</p>
+            <button className="btn-primary" style={{width:"100%"}} onClick={()=>{ setShowLotteryPopup(false); onPlayLottery(); }}>ตกลง</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LotteryScreen({orderCode,onDone}){
+  return (
+    <div style={{padding:"24px 16px 100px",textAlign:"center"}}>
+      <LotterySection orderCode={orderCode}/>
+      <button className="btn-teal" style={{marginTop:24}} onClick={onDone}>เสร็จสิ้น กลับหน้าร้าน</button>
     </div>
   );
 }
@@ -657,7 +676,10 @@ function App(){
           onBack={()=>setScreen("shop")} onConfirm={confirmOrder}/>
       )}
       {screen==="confirm" && lastOrder && (
-        <ConfirmScreen order={lastOrder} settings={settings} onNewOrder={()=>{setLastOrder(null);setScreen("shop");}}/>
+        <ConfirmScreen order={lastOrder} settings={settings} onNewOrder={()=>{setLastOrder(null);setScreen("shop");}} onPlayLottery={()=>setScreen("lottery")}/>
+      )}
+      {screen==="lottery" && lastOrder && (
+        <LotteryScreen orderCode={lastOrder.code} onDone={()=>{setLastOrder(null);setScreen("shop");}}/>
       )}
 
       {screen==="shop" && itemCount>0 && (
