@@ -441,6 +441,15 @@ function AdminPanel({onClose}){
     });
   };
 
+  const setLotteryUsed = async (code, used) => {
+    setOrders(orders.map(o=>o.code===code?{...o,lotteryUsed:used}:o));
+    await fetch(`${API_BASE}/api/orders/${code}`, {
+      method:"PUT",
+      headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
+      body: JSON.stringify({lotteryUsed:used}),
+    });
+  };
+
   if (!unlocked) {
     return (
       <div className="drawer-overlay" style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -572,8 +581,23 @@ function AdminPanel({onClose}){
               </div>
               {o.slipImage && (
                 <div style={{margin:"8px 0"}}>
-                  <p style={{fontSize:12,color:"#7A6A5C",marginBottom:4}}>สลิปโอนเงิน</p>
+                  <p style={{fontSize:12,color:"#7A6A5C",marginBottom:4}}>สลิปโอนเงิน · ยอดที่ต้องได้รับ {baht(o.total)}฿</p>
                   <img src={o.slipImage} alt="สลิป" style={{width:120,borderRadius:8,cursor:"pointer",border:"1px solid #F3E6D3"}} onClick={()=>window.open(o.slipImage,"_blank")}/>
+                  {o.slipDuplicateOf && (
+                    <p style={{color:"var(--coral)",fontSize:12,fontWeight:700,marginTop:6}}>⚠️ สลิปนี้ตรงกับออเดอร์ {o.slipDuplicateOf} เป๊ะ ตรวจสอบก่อนว่าไม่ใช่สลิปซ้ำ</p>
+                  )}
+                </div>
+              )}
+              {o.lotteryResult && (
+                <div style={{display:"flex",alignItems:"center",gap:8,margin:"6px 0",fontSize:13}}>
+                  <span>🎰 รางวัล: <b>{o.lotteryResult}</b></span>
+                  <button
+                    className="pill"
+                    style={o.lotteryUsed ? {} : {background:"var(--mustard)",borderColor:"var(--mustard)",color:"#fff"}}
+                    onClick={()=>setLotteryUsed(o.code, !o.lotteryUsed)}
+                  >
+                    {o.lotteryUsed ? "✓ ใช้แล้ว" : "ยังไม่ใช้"}
+                  </button>
                 </div>
               )}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
