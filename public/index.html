@@ -83,10 +83,19 @@ function Thumb({product}){
 function MascotCard({userId}){
   const [data,setData] = useState(null);
   const [redeeming,setRedeeming] = useState(false);
-  const [feeding,setFeeding] = useState(false);
   const [bathing,setBathing] = useState(false);
   const [patting,setPatting] = useState(false);
   const [flash,setFlash] = useState(null); // "fed" | "clean" | null
+  const [foodPos,setFoodPos] = useState(null); // {x,y} relative to stageRef, or null if not spawned
+  const [dragging,setDragging] = useState(false);
+  const [mouthOpen,setMouthOpen] = useState(false);
+  const stageRef = React.useRef(null);
+  const foodPosRef = React.useRef(null);
+  useEffect(()=>{ foodPosRef.current = foodPos; },[foodPos]);
+
+  const MOUTH = {x:100, y:80};
+  const BOX = {x:100, y:186};
+  const CATCH_R = 34;
 
   const load = () => {
     if (!userId) return;
@@ -102,18 +111,6 @@ function MascotCard({userId}){
       load();
     } finally {
       setRedeeming(false);
-    }
-  };
-
-  const feedMascot = async () => {
-    if (feeding || !data?.canFeed) return;
-    setFeeding(true);
-    try {
-      await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
-      setFlash("fed");
-      setTimeout(()=>{ setFlash(null); load(); }, 700);
-    } finally {
-      setFeeding(false);
     }
   };
 
@@ -140,6 +137,52 @@ function MascotCard({userId}){
     setTimeout(()=>setPatting(false), 900);
   };
 
+  const spawnFood = () => {
+    if (!data?.canFeed || foodPos) return;
+    setFoodPos({...BOX});
+  };
+
+  const getRelPos = (e) => {
+    const rect = stageRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const onFoodPointerDown = (e) => {
+    e.preventDefault();
+    setDragging(true);
+  };
+
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e) => {
+      const pos = getRelPos(e);
+      setFoodPos(pos);
+      const dist = Math.hypot(pos.x-MOUTH.x, pos.y-MOUTH.y);
+      setMouthOpen(dist < CATCH_R);
+    };
+    const up = async (e) => {
+      setDragging(false);
+      const pos = foodPosRef.current;
+      const dist = pos ? Math.hypot(pos.x-MOUTH.x, pos.y-MOUTH.y) : 999;
+      if (dist < CATCH_R) {
+        setMouthOpen(false);
+        setFoodPos(null);
+        setFlash("fed");
+        await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
+        setTimeout(()=>{ setFlash(null); load(); }, 500);
+      } else {
+        setMouthOpen(false);
+        setFoodPos({...BOX});
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+  }, [dragging]);
+
   if (!data) return null;
   const progress = data.nextThreshold
     ? Math.min(100, ((data.foodGiven-data.stageStart)/(data.nextThreshold-data.stageStart))*100)
@@ -147,64 +190,113 @@ function MascotCard({userId}){
 
   return (
     <div className="card" style={{marginBottom:12,textAlign:"center"}}>
-      <div style={{position:"relative",width:130,height:130,margin:"0 auto"}}>
-        <div style={{
-          width:"100%",height:"100%",
-          animation: bathing ? "none" : "mascot-bob 2.4s ease-in-out infinite",
-        }}>
-          <img
-            src={data.image}
-            alt={data.stageName}
-            style={{
-              width:"100%", height:"100%", objectFit:"contain",
-              transform: flash==="fed" ? "scale(1.12)" : patting ? "scale(1.06) rotate(-3deg)" : "scale(1)",
-              transition:"transform .25s cubic-bezier(.34,1.56,.64,1)",
-              filter: bathing ? "brightness(1.05)" : "none",
-            }}
-          />
+      <div ref={stageRef} style={{position:"relative",width:200,height:225,margin:"0 auto",touchAction: dragging ? "none" : "auto"}}>
+        <div style={{position:"absolute",top:0,left:35,width:130,height:130}}>
+          <div style={{
+            width:"100%",height:"100%",
+            animation: bathing ? "none" : "mascot-bob 2.4s ease-in-out infinite",
+          }}>
+            <img
+              src={data.image}
+              alt={data.stageName}
+              style={{
+                width:"100%", height:"100%", objectFit:"contain",
+                transform: flash==="fed" ? "scale(1.1)" : patting ? "scale(1.06) rotate(-3deg)" : mouthOpen ? "scale(1.04)" : "scale(1)",
+                transition:"transform .2s cubic-bezier(.34,1.56,.64,1)",
+                filter: bathing ? "brightness(1.05)" : "none",
+              }}
+            />
+          </div>
+
+          {/* open-mouth illusion when food is close */}
+          {mouthOpen && (
+            <div style={{
+              position:"absolute", top:66, left:"50%", transform:"translateX(-50%)",
+              width:22, height:14, borderRadius:"50% 50% 60% 60%",
+              background:"rgba(58,34,51,.75)",
+              animation:"mouth-pop .18s ease-out",
+            }}/>
+          )}
+
+          {/* dirt smudges */}
+          {data.isDirty && !bathing && (
+            <React.Fragment>
+              <div style={{position:"absolute",top:"32%",left:"22%",width:16,height:12,borderRadius:"50%",background:"rgba(140,110,72,.55)",transform:"rotate(-15deg)"}}/>
+              <div style={{position:"absolute",top:"55%",left:"66%",width:20,height:14,borderRadius:"50%",background:"rgba(140,110,72,.5)",transform:"rotate(10deg)"}}/>
+              <div style={{position:"absolute",top:"68%",left:"38%",width:14,height:10,borderRadius:"50%",background:"rgba(140,110,72,.5)"}}/>
+            </React.Fragment>
+          )}
+
+          {/* bath bubbles */}
+          {bathing && (
+            <div style={{position:"absolute",inset:-10,pointerEvents:"none"}}>
+              {[...Array(9)].map((_,i)=>(
+                <div key={i} style={{
+                  position:"absolute", left:`${10+((i*37)%85)}%`, bottom:0,
+                  width:8+((i%3)*5), height:8+((i%3)*5), borderRadius:"50%",
+                  background:"rgba(255,255,255,.65)", border:"1px solid rgba(255,255,255,.9)",
+                  animation:`bubble-rise ${0.9+((i%4)*0.15)}s ease-in ${i*0.08}s forwards`,
+                }}/>
+              ))}
+            </div>
+          )}
+
+          {/* pat hearts */}
+          {patting && (
+            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+              {[...Array(4)].map((_,i)=>(
+                <div key={i} style={{
+                  position:"absolute", top:"20%", left:`${30+i*15}%`, fontSize:16,
+                  animation:`heart-rise .9s ease-out ${i*0.1}s forwards`, opacity:0,
+                }}>💚</div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* dirt smudges */}
-        {data.isDirty && !bathing && (
-          <React.Fragment>
-            <div style={{position:"absolute",top:"32%",left:"22%",width:16,height:12,borderRadius:"50%",background:"rgba(140,110,72,.55)",transform:"rotate(-15deg)"}}/>
-            <div style={{position:"absolute",top:"55%",left:"66%",width:20,height:14,borderRadius:"50%",background:"rgba(140,110,72,.5)",transform:"rotate(10deg)"}}/>
-            <div style={{position:"absolute",top:"68%",left:"38%",width:14,height:10,borderRadius:"50%",background:"rgba(140,110,72,.5)"}}/>
-          </React.Fragment>
-        )}
+        {/* food box */}
+        <div
+          onClick={spawnFood}
+          style={{
+            position:"absolute", top:168, left:"50%", transform:"translateX(-50%)",
+            width:44, height:36, borderRadius:8,
+            background: data.canFeed ? "var(--mustard)" : "#D9C9AE",
+            border:"2px solid var(--plum)", display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:18, cursor: data.canFeed && !foodPos ? "pointer" : "default",
+            boxShadow:"0 3px 6px rgba(0,0,0,.2)",
+          }}
+        >
+          🎁
+          {data.foodInventory>0 && (
+            <span className="mono" style={{position:"absolute",bottom:-8,right:-8,background:"var(--coral)",color:"#fff",fontSize:10,fontWeight:700,borderRadius:999,padding:"1px 6px"}}>{data.foodInventory}</span>
+          )}
+        </div>
 
-        {/* bath bubbles */}
-        {bathing && (
-          <div style={{position:"absolute",inset:-10,pointerEvents:"none"}}>
-            {[...Array(9)].map((_,i)=>(
-              <div key={i} style={{
-                position:"absolute", left:`${10+((i*37)%85)}%`, bottom:0,
-                width:8+((i%3)*5), height:8+((i%3)*5), borderRadius:"50%",
-                background:"rgba(255,255,255,.65)", border:"1px solid rgba(255,255,255,.9)",
-                animation:`bubble-rise ${0.9+((i%4)*0.15)}s ease-in ${i*0.08}s forwards`,
-              }}/>
-            ))}
-          </div>
-        )}
-
-        {/* pat hearts */}
-        {patting && (
-          <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
-            {[...Array(4)].map((_,i)=>(
-              <div key={i} style={{
-                position:"absolute", top:"20%", left:`${30+i*15}%`, fontSize:16,
-                animation:`heart-rise .9s ease-out ${i*0.1}s forwards`, opacity:0,
-              }}>💚</div>
-            ))}
-          </div>
+        {/* draggable food token */}
+        {foodPos && (
+          <div
+            onPointerDown={onFoodPointerDown}
+            style={{
+              position:"absolute", top:foodPos.y-16, left:foodPos.x-16,
+              width:32, height:32, borderRadius:"50%",
+              background:"#fff", border:"2px solid var(--plum)",
+              display:"flex",alignItems:"center",justifyContent:"center", fontSize:18,
+              cursor:"grab", touchAction:"none", zIndex:10,
+              boxShadow: dragging ? "0 6px 10px rgba(0,0,0,.3)" : "0 2px 4px rgba(0,0,0,.2)",
+              transition: dragging ? "none" : "top .25s ease, left .25s ease",
+            }}
+          >🍡</div>
         )}
       </div>
 
-      <p className="mitr" style={{margin:"6px 0 2px",fontSize:15,fontWeight:700}}>
+      <p className="mitr" style={{margin:"2px 0 2px",fontSize:15,fontWeight:700}}>
         {data.stageName}{data.isDirty && !bathing ? " · ตัวเลอะจัง 🫧" : ""}
       </p>
       <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 4px"}}>
         {data.nextThreshold ? `อาหารแล้ว ${data.foodGiven}/${data.nextThreshold} ชิ้น จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
+      </p>
+      <p style={{fontSize:11,color:"#9C8A7A",margin:"0 0 12px"}}>
+        {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนปากได้เลย" : "ยังไม่มีอาหารในคลัง แลกแต้มเป็นอาหารก่อนนะครับ"}
       </p>
       <div style={{height:8,background:"var(--cream-deep)",borderRadius:999,overflow:"hidden",margin:"0 0 14px"}}>
         <div style={{height:"100%",width:`${progress}%`,background:"var(--leaf)",borderRadius:999,transition:"width .4s"}}/>
@@ -222,11 +314,6 @@ function MascotCard({userId}){
             💰 แลกแต้มเป็นอาหาร (ใช้ {data.pointsPerFood} แต้ม)
           </button>
         )}
-        {data.nextThreshold && (
-          <button className="btn-teal" style={{background: flash==="fed" ? "var(--leaf)" : (data.canFeed ? "var(--coral)" : "#C9BBA5")}} disabled={feeding || !data.canFeed} onClick={feedMascot}>
-            {flash==="fed" ? "อร่อยมาก! 😋" : `🍽️ ให้อาหารมาสคอต`}
-          </button>
-        )}
         {data.isDirty && (
           <button className="btn-teal" style={{background: flash==="clean" ? "var(--leaf)" : "#3D7FBF"}} disabled={bathing} onClick={bathMascot}>
             {bathing ? "กำลังอาบน้ำ... 🫧" : flash==="clean" ? "สะอาดแล้ว! ✨" : "🛁 อาบน้ำให้มาสคอต"}
@@ -241,6 +328,7 @@ function MascotCard({userId}){
         @keyframes mascot-bob { 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(-6px) rotate(-2deg);} }
         @keyframes bubble-rise { 0%{ transform: translateY(0) scale(.6); opacity:0;} 15%{ opacity:1;} 100%{ transform: translateY(-140px) scale(1); opacity:0;} }
         @keyframes heart-rise { 0%{ transform: translateY(0) scale(.5); opacity:0;} 20%{ opacity:1;} 100%{ transform: translateY(-46px) scale(1.1); opacity:0;} }
+        @keyframes mouth-pop { 0%{ transform: translateX(-50%) scale(.5); opacity:0;} 100%{ transform: translateX(-50%) scale(1); opacity:1;} }
       `}</style>
     </div>
   );
@@ -726,6 +814,16 @@ function AdminPanel({onClose}){
     });
   };
 
+  const grantMascotFood = async (userId, amount) => {
+    if (!userId) return;
+    await fetch(`${API_BASE}/api/mascot/${userId}/grant`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "x-admin-passcode":passcode },
+      body: JSON.stringify({amount}),
+    });
+    alert(`แจกอาหารมาสคอต +${amount} ชิ้นให้ลูกค้าคนนี้แล้ว`);
+  };
+
   if (!unlocked) {
     return (
       <div className="drawer-overlay" style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -900,6 +998,11 @@ function AdminPanel({onClose}){
                   ))}
                 </div>
               </div>
+              {o.userId && (
+                <button className="pill" style={{width:"100%",marginTop:8}} onClick={()=>grantMascotFood(o.userId, 3)}>
+                  🎁 แจกอาหารมาสคอต +3 ให้ลูกค้าคนนี้
+                </button>
+              )}
             </div>
           ))
         )}
