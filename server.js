@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 
 const config = {
@@ -260,6 +261,7 @@ app.post('/api/lottery/:code', express.json(), async (req, res) => {
 
     const winner = pickWeighted(items);
     order.lotteryResult = winner.label;
+    order.lotteryUsed = false;
     writeOrders(orders);
 
     if (ADMIN_USER_ID) {
@@ -289,7 +291,8 @@ app.put('/api/orders/:code', express.json(), requireAdmin, (req, res) => {
   const orders = readOrders();
   const order = orders.find((o) => o.code === req.params.code);
   if (!order) return res.status(404).json({ error: 'not found' });
-  order.status = req.body.status || order.status;
+  if (req.body.status !== undefined) order.status = req.body.status;
+  if (req.body.lotteryUsed !== undefined) order.lotteryUsed = req.body.lotteryUsed;
   writeOrders(orders);
   res.json({ ok: true });
 });
@@ -315,7 +318,12 @@ app.post('/api/upload-slip', express.json({ limit: '8mb' }), async (req, res) =>
     fs.writeFileSync(path.join(UPLOADS_DIR, filename), Buffer.from(data, 'base64'));
 
     const slipUrl = `https://${req.get('host')}/uploads/${filename}`;
+    const slipHash = crypto.createHash('sha256').update(data).digest('hex');
+    const duplicate = orders.find((o) => o.code !== code && o.slipHash === slipHash);
+
     order.slipImage = slipUrl;
+    order.slipHash = slipHash;
+    if (duplicate) order.slipDuplicateOf = duplicate.code;
     order.status = 'กำลังทำ';
     writeOrders(orders);
 
@@ -325,10 +333,11 @@ app.post('/api/upload-slip', express.json({ limit: '8mb' }), async (req, res) =>
         originalContentUrl: slipUrl,
         previewImageUrl: slipUrl,
       });
-      await client.pushMessage(ADMIN_USER_ID, {
-        type: 'text',
-        text: `สลิปโอนเงินออเดอร์ ${code} ครับ ↑\nระบบอัปเดตสถานะเป็น "กำลังทำ" ให้อัตโนมัติแล้ว`,
-      });
+      let adminText = `สลิปโอนเงินออเดอร์ ${code} ครับ ↑\nยอดที่ต้องได้รับ: ${order.total}฿\nระบบอัปเดตสถานะเป็น "กำลังทำ" ให้อัตโนมัติแล้ว`;
+      if (duplicate) {
+        adminText += `\n\n⚠️ คำเตือน: สลิปนี้ตรงกับสลิปของออเดอร์ ${duplicate.code} เป๊ะ กรุณาตรวจสอบก่อนว่าไม่ใช่สลิปซ้ำ`;
+      }
+      await client.pushMessage(ADMIN_USER_ID, { type: 'text', text: adminText });
     }
 
     if (order.userId) {
