@@ -297,7 +297,7 @@ function MascotCard({userId}){
             padding:"6px 10px", borderRadius:10, whiteSpace:"nowrap", zIndex:15,
             animation:"hint-fade 2.5s ease-in-out forwards",
           }}>
-            ลากอาหารไปป้อนปากมาสคอตได้เลย! 👆
+            ลากอาหารไปป้อนน้องได้เลย! 👆
             <div style={{position:"absolute", bottom:-5, left:"50%", width:10, height:10, background:"var(--plum)", transform:"translateX(-50%) rotate(45deg)"}}/>
           </div>
         )}
@@ -326,7 +326,7 @@ function MascotCard({userId}){
         {data.nextThreshold ? `อาหารแล้ว ${data.foodGiven}/${data.nextThreshold} ชิ้น จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
       </p>
       <p style={{fontSize:11,color:"#9C8A7A",margin:"0 0 12px"}}>
-        {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนปากได้เลย" : "ยังไม่มีอาหารในคลัง แลกแต้มเป็นอาหารก่อนนะครับ"}
+        {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนน้องได้เลย" : "ยังไม่มีอาหารในคลัง แลกแต้มเป็นอาหารก่อนนะครับ"}
       </p>
       <div style={{height:8,background:"var(--cream-deep)",borderRadius:999,overflow:"hidden",margin:"0 0 14px"}}>
         <div style={{height:"100%",width:`${progress}%`,background:"var(--leaf)",borderRadius:999,transition:"width .4s"}}/>
