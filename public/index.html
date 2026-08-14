@@ -164,6 +164,7 @@ function MascotCard({userId}){
   const [redeeming,setRedeeming] = useState(false);
   const [bathing,setBathing] = useState(false);
   const [showBathPopup,setShowBathPopup] = useState(false);
+  const [showShopPopup,setShowShopPopup] = useState(false);
   const [patting,setPatting] = useState(false);
   const [flash,setFlash] = useState(null); // "fed" | "clean" | null
   const [foodPos,setFoodPos] = useState(null); // {x,y} relative to stageRef, or null if not spawned
@@ -415,21 +416,20 @@ function MascotCard({userId}){
         <div style={{height:"100%",width:`${progress}%`,background:"linear-gradient(90deg,#8FBE63,var(--leaf))",borderRadius:999,transition:"width .4s"}}/>
       </div>
 
-      <div style={{background:"#fff",border:"1px solid #F0E2C4",borderRadius:18,padding:"14px 16px",marginBottom:10,boxShadow:"0 4px 12px -8px rgba(58,34,51,.2)"}}>
-        <div style={{fontSize:24,marginBottom:2}}>💎</div>
-        <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>แต้มของคุณ</p>
-        <p className="mono" style={{fontSize:22,fontWeight:800,color:"var(--coral)",margin:"2px 0 4px"}}>{data.availablePoints} แต้ม</p>
-        <p style={{fontSize:11,color:"#9C8A7A",margin:0}}>ทุกออเดอร์ที่เสร็จแล้วได้ 1 แต้ม (ไม่ว่ายอดเท่าไหร่) · เก็บไว้แลกของอื่นๆ ได้อีกในอนาคต เช่น เครื่องแต่งกายมาสคอต 👒</p>
-      </div>
-
-      <div style={{background:"#fff",border:"1px solid #F0E2C4",borderRadius:18,padding:"14px 16px",marginBottom:14,boxShadow:"0 4px 12px -8px rgba(58,34,51,.2)"}}>
-        <div style={{fontSize:26,marginBottom:2}}>🎁</div>
-        <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>อาหารในคลัง</p>
-        <p className="mono" style={{fontSize:22,fontWeight:800,color:"var(--leaf)",margin:"2px 0 4px"}}>{data.foodInventory} ชิ้น</p>
-        <p style={{fontSize:11,color:"#9C8A7A",margin:0}}>ใช้ {data.pointsPerFood} แต้ม แลกอาหารมาสคอตได้ 1 ชิ้น</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+        <div style={{background:"#fff",border:"1px solid #F0E2C4",borderRadius:14,padding:"10px 8px",textAlign:"center",boxShadow:"0 3px 8px -6px rgba(58,34,51,.2)"}}>
+          <div style={{fontSize:17,lineHeight:1}}>💎</div>
+          <p style={{fontSize:10,color:"#7A6A5C",margin:"3px 0 0"}}>แต้มของคุณ</p>
+          <p className="mono" style={{fontSize:16,fontWeight:800,color:"var(--coral)",margin:"1px 0 0"}}>{data.availablePoints}</p>
+        </div>
+        <div style={{background:"#fff",border:"1px solid #F0E2C4",borderRadius:14,padding:"10px 8px",textAlign:"center",boxShadow:"0 3px 8px -6px rgba(58,34,51,.2)"}}>
+          <div style={{fontSize:17,lineHeight:1}}>🎁</div>
+          <p style={{fontSize:10,color:"#7A6A5C",margin:"3px 0 0"}}>อาหารในคลัง</p>
+          <p className="mono" style={{fontSize:16,fontWeight:800,color:"var(--leaf)",margin:"1px 0 0"}}>{data.foodInventory}</p>
+        </div>
       </div>
       <p style={{fontSize:11,color:"#9C8A7A",margin:"0 0 12px"}}>
-        {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนน้องได้เลย" : "ยังไม่มีอาหารในคลัง แลกแต้มเป็นอาหารก่อนนะครับ"}
+        {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนน้องได้เลย" : `ทุกออเดอร์ที่เสร็จแล้วได้ 1 แต้ม · ใช้ ${data.pointsPerFood} แต้มแลกอาหารมาสคอตได้ 1 ชิ้น`}
       </p>
 
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -446,9 +446,22 @@ function MascotCard({userId}){
         <button className="pill" style={{width:"100%",borderRadius:999}} disabled={patting} onClick={patMascot}>
           🤚 ลูบหัวมาสคอต
         </button>
+        <button className="pill" style={{width:"100%",borderRadius:999}} onClick={()=>setShowShopPopup(true)}>
+          🛍 ร้านค้า
+        </button>
       </div>
 
       {showBathPopup && <BathPopup stage={data.stage} onClose={finishBath}/>}
+      {showShopPopup && (
+        <div className="drawer-overlay" style={{display:"flex",alignItems:"center",justifyContent:"center",zIndex:50}} onClick={()=>setShowShopPopup(false)}>
+          <div className="card" style={{width:260,textAlign:"center",position:"relative"}} onClick={e=>e.stopPropagation()}>
+            <button onClick={()=>setShowShopPopup(false)} aria-label="ปิด" style={{position:"absolute",top:10,right:12,fontSize:18,color:"#9C8A7A"}}>✕</button>
+            <div style={{fontSize:38,margin:"6px 0 4px"}}>👒✨</div>
+            <p className="mitr" style={{fontWeight:700,fontSize:15,margin:"0 0 6px"}}>ร้านค้ากำลังจะมาเร็วๆ นี้!</p>
+            <p style={{fontSize:12,color:"#9C8A7A",margin:0}}>เร็วๆ นี้จะใช้แต้มแลกเครื่องแต่งกายให้มาสคอตได้ที่นี่ รอติดตามนะครับ 🎉</p>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes sparkle-float { 0%,100%{ transform: translateY(0) rotate(0deg); opacity:.85;} 50%{ transform: translateY(-7px) rotate(12deg); opacity:1;} }
