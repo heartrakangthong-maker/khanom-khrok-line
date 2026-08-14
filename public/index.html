@@ -148,20 +148,20 @@ function useCuteSound(){
   const playSnack = () => {
     try {
       const ctx = getCtx();
-      // เสียง "ง้บๆ" สั้นๆ สองครั้ง เหมือนกัดขนม
-      const bites = [0, 0.14];
-      bites.forEach((offset) => {
-        const t0 = ctx.currentTime + offset;
+      // เสียง "หย่ำๆ" สดใส 3 โน้ตไต่ขึ้น เหมือนเคี้ยวขนมอร่อยๆ
+      const notes = [520, 660, 880];
+      notes.forEach((freq, i) => {
+        const t0 = ctx.currentTime + i * 0.09;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(320, t0);
-        osc.frequency.exponentialRampToValueAtTime(200, t0 + 0.09);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, t0);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.15, t0 + 0.07);
         gain.gain.setValueAtTime(0, t0);
-        gain.gain.linearRampToValueAtTime(0.22, t0 + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.11);
+        gain.gain.linearRampToValueAtTime(0.2, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.13);
         osc.connect(gain).connect(ctx.destination);
-        osc.start(t0); osc.stop(t0 + 0.12);
+        osc.start(t0); osc.stop(t0 + 0.14);
       });
     } catch (e) { /* เบราว์เซอร์บางตัวอาจเล่นเสียงไม่ได้ ข้ามไปเงียบๆ */ }
   };
@@ -256,7 +256,7 @@ function MascotCard({userId}){
     try {
       await fetch(`${API_BASE}/api/mascot/${userId}/snack`, { method:"POST" });
       setFlash("fed");
-      setTimeout(()=>setFlash(null), 500);
+      setTimeout(()=>setFlash(null), 720);
       load();
     } finally {
       setSnacking(false);
@@ -270,7 +270,7 @@ function MascotCard({userId}){
     try {
       await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
       setFlash("fed");
-      setTimeout(()=>setFlash(null), 500);
+      setTimeout(()=>setFlash(null), 720);
       load();
     } finally {
       setSpecialFeeding(false);
@@ -368,8 +368,9 @@ function MascotCard({userId}){
         setMouthOpen(false);
         setFoodPos(null);
         setFlash("fed");
+        playSnack();
         await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
-        setTimeout(()=>{ setFlash(null); load(); }, 500);
+        setTimeout(()=>{ setFlash(null); load(); }, 720);
       } else {
         setMouthOpen(false);
         setFoodPos({...BOX});
@@ -446,7 +447,8 @@ function MascotCard({userId}){
               alt={data.stageName}
               style={{
                 width:"100%", height:"100%", objectFit:"contain",
-                transform: flash==="fed" ? "scale(1.1)" : patting ? "scale(1.06) rotate(-3deg)" : mouthOpen ? "scale(1.04)" : "scale(1)",
+                animation: flash==="fed" ? "fed-bounce .6s cubic-bezier(.34,1.56,.64,1)" : "none",
+                transform: flash==="fed" ? undefined : patting ? "scale(1.06) rotate(-3deg)" : mouthOpen ? "scale(1.04)" : "scale(1)",
                 transition:"transform .2s cubic-bezier(.34,1.56,.64,1)",
                 filter: bathing ? "brightness(1.05)" : "none",
               }}
@@ -491,6 +493,25 @@ function MascotCard({userId}){
               fontSize:30, transformOrigin:"70% 0%",
               animation:"hand-pat .9s ease-in-out",
             }}>🤚</div>
+          )}
+
+          {/* fed crumbs + nom bubble */}
+          {flash==="fed" && (
+            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+              {["✨","🍚","✨","🍚","✨"].map((emo,i)=>(
+                <div key={i} style={{
+                  position:"absolute", top:"48%", left:`${18+i*16}%`, fontSize:13,
+                  animation:`crumb-burst .7s ease-out ${i*0.05}s forwards`, opacity:0,
+                }}>{emo}</div>
+              ))}
+              <div style={{
+                position:"absolute", top:-6, left:"50%", transform:"translateX(-50%)",
+                background:"#fff", border:"1.5px solid var(--cream-deep)", borderRadius:12,
+                padding:"3px 10px", fontSize:12, fontWeight:700, color:"var(--plum)",
+                whiteSpace:"nowrap", fontFamily:"'Mitr',sans-serif",
+                animation:"nom-pop .6s ease-out forwards", boxShadow:"0 3px 8px -3px rgba(58,34,51,.3)",
+              }}>ง้บ! 😋</div>
+            </div>
           )}
         </div>
 
@@ -623,6 +644,24 @@ function MascotCard({userId}){
         @keyframes sparkle-float { 0%,100%{ transform: translateY(0) rotate(0deg); opacity:.85;} 50%{ transform: translateY(-7px) rotate(12deg); opacity:1;} }
         @keyframes mascot-bob { 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(-6px) rotate(-2deg);} }
         @keyframes heart-rise { 0%{ transform: translateY(0) scale(.5); opacity:0;} 20%{ opacity:1;} 100%{ transform: translateY(-46px) scale(1.1); opacity:0;} }
+        @keyframes fed-bounce {
+          0% { transform: scale(1,1); }
+          25% { transform: scale(1.16,0.86); }
+          50% { transform: scale(0.92,1.1); }
+          75% { transform: scale(1.06,0.96); }
+          100% { transform: scale(1,1); }
+        }
+        @keyframes crumb-burst {
+          0% { transform: translateY(0) scale(.4); opacity:0; }
+          25% { opacity:1; }
+          100% { transform: translateY(-30px) scale(1); opacity:0; }
+        }
+        @keyframes nom-pop {
+          0% { transform: translateX(-50%) translateY(4px) scale(.7); opacity:0; }
+          30% { transform: translateX(-50%) translateY(-2px) scale(1.08); opacity:1; }
+          75% { transform: translateX(-50%) translateY(-4px) scale(1); opacity:1; }
+          100% { transform: translateX(-50%) translateY(-10px) scale(.95); opacity:0; }
+        }
         @keyframes mouth-pop { 0%{ transform: translateX(-50%) scale(.5); opacity:0;} 100%{ transform: translateX(-50%) scale(1); opacity:1;} }
         @keyframes box-nudge { 0%,100%{ transform: translateX(-50%) rotate(0deg);} 50%{ transform: translateX(-50%) rotate(-6deg);} }
         @keyframes hint-fade { 0%{ opacity:0; transform: translateX(-50%) translateY(4px);} 10%{ opacity:1; transform: translateX(-50%) translateY(0);} 85%{ opacity:1;} 100%{ opacity:0;} }
