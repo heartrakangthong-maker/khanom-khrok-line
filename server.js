@@ -166,11 +166,6 @@ function makeOrderCode() {
   return `SK${y}${m}${day}-${rand}`;
 }
 
-/* -------------------------------------------------------------
-   1) หน้าสั่งซื้อ (LIFF) เรียก endpoint นี้ตอนลูกค้ากด "ยืนยันสั่งซื้อ"
-      body: { userId, name, lineDisplayName, items, total, fulfil, note }
-      userId ได้จาก liff.getProfile() ฝั่งหน้าเว็บ — ต้องรันอยู่ใน LIFF เท่านั้น
-------------------------------------------------------------- */
 app.post('/api/order', express.json(), async (req, res) => {
   try {
     const { userId, name, lineDisplayName, items, total, fulfil, note } = req.body;
@@ -207,9 +202,6 @@ app.post('/api/order', express.json(), async (req, res) => {
   }
 });
 
-/* -------------------------------------------------------------
-   เมนู/ราคา — หน้าเว็บดึงมาแสดงตอนเปิดหน้า, แอดมินแก้ไขผ่าน /api/catalog (PUT)
-------------------------------------------------------------- */
 app.get('/api/catalog', (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(readCatalog());
@@ -236,9 +228,6 @@ app.post('/api/notify-soldout', express.json(), requireAdmin, async (req, res) =
   }
 });
 
-/* -------------------------------------------------------------
-   ออเดอร์ — สำหรับหน้าแดชบอร์ดแอดมิน (ต้องส่ง header x-admin-passcode)
-------------------------------------------------------------- */
 app.get('/api/settings', (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(readSettings());
@@ -267,12 +256,10 @@ function getMascotStage(foodGiven) {
   }
   return current;
 }
-// แต้มนับเฉพาะออเดอร์ที่แอดมินกดยืนยันว่า "เสร็จแล้ว" เท่านั้น
-// (แอดมินจะเห็นรูปสลิป+ยอดที่ต้องได้รับก่อนตัดสินใจกดเสมอ ถือเป็นจุดตรวจสอบยอดจริง)
+// ทุกออเดอร์ที่แอดมินกดยืนยันว่า "เสร็จแล้ว" เท่านั้นที่นับ (แอดมินเห็นรูปสลิป+ยอดที่ต้องได้รับก่อนกดเสมอ ถือเป็นจุดตรวจสอบยอดจริง)
+// ลูกค้าได้ 1 แต้มต่อ 1 ออเดอร์ที่เสร็จแล้ว (ไม่ขึ้นกับยอดเงิน) — แต้มนี้เก็บสะสมไว้แลกของอื่นๆ ได้ในอนาคต เช่น เครื่องแต่งกายมาสคอต
 function calcTotalPoints(orders, userId) {
-  return orders
-    .filter((o) => o.userId === userId && o.status === 'เสร็จแล้ว')
-    .reduce((sum, o) => sum + Math.floor((Number(o.total) || 0) / 100), 0);
+  return orders.filter((o) => o.userId === userId && o.status === 'เสร็จแล้ว').length;
 }
 
 const MASCOT_FED_FILE = path.join(__dirname, 'mascot-fed.json');
@@ -439,12 +426,6 @@ app.put('/api/orders/:code', express.json(), requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-/* -------------------------------------------------------------
-   2) LINE เรียก endpoint นี้ทุกครั้งที่มี event
-      (ข้อความจากลูกค้า, ปุ่ม postback ที่แอดมินกดเปลี่ยนสถานะ)
-      line.middleware ตรวจลายเซ็น X-Line-Signature ให้อัตโนมัติ
-      ต้องตั้งค่า Webhook URL ใน console เป็น .../webhook
-------------------------------------------------------------- */
 app.post('/api/upload-slip', express.json({ limit: '8mb' }), async (req, res) => {
   try {
     const { code, imageBase64 } = req.body;
@@ -492,8 +473,6 @@ app.post('/api/upload-slip', express.json({ limit: '8mb' }), async (req, res) =>
       ]);
     }
 
-    // ตั้งเวลาไว้ 10 นาที เปลี่ยนเป็น "เสร็จแล้ว" อัตโนมัติ
-    // (ถ้าแอดมินเปลี่ยนสถานะเองก่อนหน้านั้นแล้ว จะไม่ทับสถานะที่แอดมินตั้ง)
     setTimeout(async () => {
       try {
         const latestOrders = readOrders();
@@ -538,7 +517,6 @@ function matchFaq(text, faqs) {
 }
 
 async function handleEvent(event) {
-  // แอดมินกดปุ่มในการ์ดแจ้งเตือนออเดอร์ เพื่อเปลี่ยนสถานะ
   if (event.type === 'postback') {
     const data = new URLSearchParams(event.postback.data);
     if (data.get('action') !== 'set_status') return;
@@ -566,7 +544,6 @@ async function handleEvent(event) {
     return;
   }
 
-  // ลูกค้าพิมพ์ข้อความมาในแชท OA เอง — ตอบลิงก์เข้า LIFF ให้สั่งของ
   if (event.type === 'message' && event.message.type === 'text') {
     const text = event.message.text.trim();
     if (text === 'เมนู' || text === 'สั่งของ' || text === 'order') {
@@ -727,9 +704,6 @@ function buildReceiptFlex(order) {
   };
 }
 
-/* -------------------------------------------------------------
-   รีเซ็ตสถานะ "หมด" ของทุกเมนูกลับเป็นมีสินค้า อัตโนมัติทุกวัน 06:00 น. (เวลาไทย)
-------------------------------------------------------------- */
 function resetSoldOut() {
   try {
     const catalog = readCatalog();
