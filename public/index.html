@@ -189,6 +189,11 @@ function MascotCard({userId}){
   const [dragging,setDragging] = useState(false);
   const [mouthOpen,setMouthOpen] = useState(false);
   const [showDragHint,setShowDragHint] = useState(false);
+  const [editingName,setEditingName] = useState(false);
+  const [nameInput,setNameInput] = useState("");
+  const [savingName,setSavingName] = useState(false);
+  const [snacking,setSnacking] = useState(false);
+  const [specialFeeding,setSpecialFeeding] = useState(false);
   const stageRef = React.useRef(null);
   const foodPosRef = React.useRef(null);
   const { playPat } = useCuteSound();
@@ -203,6 +208,73 @@ function MascotCard({userId}){
     fetch(`${API_BASE}/api/mascot/${userId}`, {cache:"no-store"}).then(r=>r.json()).then(setData).catch(()=>{});
   };
   useEffect(load, [userId]);
+
+  const startEditName = () => {
+    setNameInput(data?.customName || "");
+    setEditingName(true);
+  };
+  const saveName = async () => {
+    if (savingName) return;
+    setSavingName(true);
+    try {
+      await fetch(`${API_BASE}/api/mascot/${userId}/name`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({name: nameInput.trim().slice(0,20)}),
+      });
+      setEditingName(false);
+      load();
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const giveSnack = async () => {
+    if (snacking || !data?.canSnack) return;
+    setSnacking(true);
+    try {
+      await fetch(`${API_BASE}/api/mascot/${userId}/snack`, { method:"POST" });
+      setFlash("fed");
+      setTimeout(()=>setFlash(null), 500);
+      load();
+    } finally {
+      setSnacking(false);
+    }
+  };
+
+  const giveSpecialFood = async () => {
+    if (specialFeeding || !data?.canFeed) return;
+    setSpecialFeeding(true);
+    try {
+      await fetch(`${API_BASE}/api/mascot/${userId}/feed`, { method:"POST" });
+      setFlash("fed");
+      setTimeout(()=>setFlash(null), 500);
+      load();
+    } finally {
+      setSpecialFeeding(false);
+    }
+  };
+
+  const shareMascot = () => {
+    const text = `น้อง${data?.customName ? `"${data.customName}"` : ""}ของฉันตอนนี้เป็น ${data?.stageName} แล้ว! มาเลี้ยงมาสคอตด้วยกันได้ที่ขนมครกสิงคโปร์ OK นะ 🌿`;
+    try {
+      if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+        liff.shareTargetPicker([{ type:"text", text }]);
+      } else if (window.liff && liff.isLoggedIn && liff.isLoggedIn()) {
+        // เผื่อ LINE เวอร์ชันเก่าไม่รองรับ shareTargetPicker
+        alert("อุปกรณ์นี้ยังแชร์ผ่านปุ่มไม่ได้ ลองคัดลอกข้อความไปแชร์เองก่อนนะครับ:\n\n" + text);
+      }
+    } catch (e) { /* เงียบไว้ ไม่ให้แอปพัง */ }
+  };
+
+  const formatCooldown = (ms) => {
+    const totalMin = Math.max(1, Math.ceil(ms / 60000));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h <= 0) return `อีก ${m} นาที`;
+    return `อีก ${h} ชม. ${m} นาที`;
+  };
+
+  const MOOD_BADGE = { happy:"😊", hungry:"🍽️", dirty:"🫧", sad:"😢" };
 
   const redeem = async () => {
     if (redeeming || !data?.canRedeem) return;
@@ -297,12 +369,26 @@ function MascotCard({userId}){
     <div className="card" style={{marginBottom:12,textAlign:"center",background:"linear-gradient(180deg,#FFFDF6,var(--cream-deep))",border:"1px solid #F0E2C4",borderRadius:26,padding:"20px 16px",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:-30,left:-30,width:110,height:110,borderRadius:"50%",background:"radial-gradient(circle,#E3A33533,transparent 70%)"}}/>
       <div style={{position:"absolute",bottom:-40,right:-30,width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle,#527A5433,transparent 70%)"}}/>
-      <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,padding:"5px 14px",margin:"0 0 12px",position:"relative",boxShadow:"0 3px 8px -4px rgba(58,34,51,.2)"}}>
-        <span style={{fontSize:14}}>🌿</span>
-        <p className="mitr" style={{margin:0,fontSize:14,fontWeight:700,color:"var(--plum)"}}>
-          {data.stageName}{data.isDirty && !bathing ? " · เลอะจัง 🫧" : ""}
-        </p>
-      </div>
+      {data.seasonalEvent && data.seasonalEvent.active && data.seasonalEvent.label && (
+        <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"var(--coral)",color:"#fff",borderRadius:999,padding:"4px 12px",margin:"0 0 8px",fontSize:11.5,fontWeight:700,position:"relative"}}>
+          <span>{data.seasonalEvent.emoji || "🎉"}</span><span>{data.seasonalEvent.label}</span>
+        </div>
+      )}
+      {!editingName ? (
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,padding:"5px 14px",margin:"0 0 12px",position:"relative",boxShadow:"0 3px 8px -4px rgba(58,34,51,.2)"}}>
+          <span style={{fontSize:14}}>🌿</span>
+          <p className="mitr" style={{margin:0,fontSize:14,fontWeight:700,color:"var(--plum)"}}>
+            {data.stageName}{data.customName ? ` "${data.customName}"` : ""}{data.isDirty && !bathing ? " · เลอะจัง 🫧" : ""}
+          </p>
+          <button onClick={startEditName} aria-label="แก้ไขชื่อ" style={{fontSize:12,color:"#9C8A7A",padding:0}}>✏️</button>
+        </div>
+      ) : (
+        <div style={{display:"flex",alignItems:"center",gap:6,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,padding:"5px 6px 5px 14px",margin:"0 0 12px",position:"relative",boxShadow:"0 3px 8px -4px rgba(58,34,51,.2)",maxWidth:260,marginLeft:"auto",marginRight:"auto"}}>
+          <input type="text" value={nameInput} onChange={e=>setNameInput(e.target.value)} maxLength={20} placeholder="ตั้งชื่อน้อง" style={{border:"none",padding:"4px 0",fontSize:13,flex:1,minWidth:0}} onKeyDown={e=>e.key==="Enter"&&saveName()}/>
+          <button onClick={saveName} disabled={savingName} style={{fontSize:12,fontWeight:700,color:"var(--teal)",padding:"4px 8px"}}>บันทึก</button>
+          <button onClick={()=>setEditingName(false)} style={{fontSize:14,color:"#9C8A7A",padding:"4px 4px"}}>✕</button>
+        </div>
+      )}
       <div ref={stageRef} style={{position:"relative",width:200,height:225,margin:"0 auto",touchAction: dragging ? "none" : "auto"}}>
         <div style={{
           position:"absolute", top:8, left:12, width:176, height:176, borderRadius:"50%",
@@ -319,6 +405,14 @@ function MascotCard({userId}){
             }}>{emojis[i]}</div>
           );
         })}
+        <div style={{
+          position:"absolute", top:130, left:130, width:34, height:34, borderRadius:"50%",
+          background:"#fff", border:"2px solid var(--cream-deep)", display:"flex",
+          alignItems:"center", justifyContent:"center", fontSize:16,
+          boxShadow:"0 3px 8px -2px rgba(58,34,51,.3)", zIndex:6,
+        }}>
+          {MOOD_BADGE[data.mood] || "😊"}
+        </div>
         <div style={{position:"absolute",top:0,left:35,width:130,height:130}}>
           <div style={{
             width:"100%",height:"100%",
@@ -448,24 +542,37 @@ function MascotCard({userId}){
         </div>
         <div style={{background:"#fff",border:"1px solid #F0E2C4",borderRadius:14,padding:"10px 8px",textAlign:"center",boxShadow:"0 3px 8px -6px rgba(58,34,51,.2)"}}>
           <div style={{fontSize:17,lineHeight:1}}>🎁</div>
-          <p style={{fontSize:10,color:"#7A6A5C",margin:"3px 0 0"}}>อาหารในคลัง</p>
+          <p style={{fontSize:10,color:"#7A6A5C",margin:"3px 0 0"}}>อาหารพิเศษ</p>
           <p className="mono" style={{fontSize:16,fontWeight:800,color:"var(--leaf)",margin:"1px 0 0"}}>{data.foodInventory}</p>
         </div>
       </div>
       <p style={{fontSize:11,color:"#9C8A7A",margin:"0 0 12px"}}>
-        {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนน้องได้เลย" : `ทุกออเดอร์ที่เสร็จแล้วได้ 1 แต้ม · ใช้ ${data.pointsPerFood} แต้มแลกอาหารมาสคอตได้ 1 ชิ้น`}
+        {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนน้องได้เลย หรือกดปุ่ม \"ป้อนอาหารพิเศษ\" ด้านล่าง" : `ทุกออเดอร์ที่เสร็จแล้วได้ 1 แต้ม · ใช้ ${data.pointsPerFood} แต้มแลกอาหารพิเศษได้ 1 ชิ้น`}
       </p>
 
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {data.nextThreshold && (
           <button className="btn-teal" style={{background: data.canRedeem ? "var(--teal)" : "#C9BBA5",borderRadius:999}} disabled={redeeming || !data.canRedeem} onClick={redeem}>
-            💰 แลกแต้มเป็นอาหาร (ใช้ {data.pointsPerFood} แต้ม)
+            💰 แลกแต้มเป็นอาหารพิเศษ (ใช้ {data.pointsPerFood} แต้ม)
           </button>
         )}
+        <button className="pill" style={{width:"100%",borderRadius:999,background: data.canSnack ? "#fff" : "#F2EEE2",borderColor: data.canSnack ? "var(--leaf)" : "#DCD2BA",color: data.canSnack ? "#3E6B2C" : "#A69A85"}} disabled={snacking || !data.canSnack} onClick={giveSnack}>
+          {data.canSnack ? "🍙 ให้อาหารว่าง (ฟรี)" : `🍙 ให้อาหารว่าง · ${formatCooldown(data.snackCooldownMs)}`}
+        </button>
         {data.isDirty && (
           <button className="btn-teal" style={{background: flash==="clean" ? "var(--leaf)" : "#3D7FBF",borderRadius:999,boxShadow:"0 4px 10px -4px rgba(61,127,191,.6)"}} disabled={bathing} onClick={openBathPopup}>
             {bathing ? "กำลังอาบน้ำ... 🫧" : flash==="clean" ? "สะอาดแล้ว! ✨" : "🛁 อาบน้ำให้มาสคอต"}
           </button>
+        )}
+        {data.nextThreshold && (
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <button className="pill" style={{borderRadius:999,fontSize:12.5,padding:"10px 6px",background: data.canFeed ? "linear-gradient(180deg,#F0B84A,#E3A335)" : "#E4DCC8",color: data.canFeed ? "#fff" : "#9C8A7A",border:"none"}} disabled={specialFeeding || !data.canFeed} onClick={giveSpecialFood}>
+              🎁 {data.canFeed ? "ป้อนอาหารพิเศษ" : "ไม่มีในคลัง"}
+            </button>
+            <button className="pill" style={{borderRadius:999,fontSize:12.5,padding:"10px 6px",borderColor:"#06C755",color:"#06C755"}} onClick={shareMascot}>
+              📤 แชร์เพื่อน
+            </button>
+          </div>
         )}
         <button className="pill" style={{width:"100%",borderRadius:999}} onClick={()=>setShowShopPopup(true)}>
           🛍 ร้านค้า
@@ -970,7 +1077,7 @@ function AdminPanel({onClose}){
   const [orders,setOrders] = useState([]);
   const [tab,setTab] = useState("menu");
   const [error,setError] = useState("");
-  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:"",faqs:[],lottery:[],pointsPerFood:1});
+  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:"",faqs:[],lottery:[],pointsPerFood:1,seasonalEvent:{active:false,label:"",emoji:"🎉"}});
   const [showAdminBathTest,setShowAdminBathTest] = useState(false);
 
   const unlock = async () => {
@@ -1139,6 +1246,34 @@ function AdminPanel({onClose}){
             </button>
             <p style={{fontSize:11,color:"#9C8A7A",marginTop:6}}>
               ใช้เช็คหน้าตา Pop-up และเสียงก่อนปล่อยให้ลูกค้าใช้งานจริง — กดแล้วไม่กระทบข้อมูลลูกค้าคนไหนทั้งสิ้น
+            </p>
+          </div>
+        )}
+        {tab==="mascot" && (
+          <div className="card" style={{marginTop:12}}>
+            <p className="mitr" style={{fontWeight:700,fontSize:14,margin:"0 0 10px"}}>🎉 อีเวนต์ตามเทศกาล</p>
+            <label style={{fontSize:12,color:"#7A6A5C"}}>ข้อความป้ายอีเวนต์ (เว้นว่าง = ไม่แสดง)</label>
+            <input type="text" value={paySettings.seasonalEvent?.label||""} placeholder="เช่น เทศกาลสงกรานต์ 🎉" onChange={e=>{
+              const next = {...paySettings, seasonalEvent: {...(paySettings.seasonalEvent||{}), label:e.target.value}};
+              savePaySettings(next);
+            }} style={{marginTop:6,marginBottom:10}}/>
+            <label style={{fontSize:12,color:"#7A6A5C"}}>อีโมจิของป้าย</label>
+            <input type="text" value={paySettings.seasonalEvent?.emoji||"🎉"} maxLength={4} onChange={e=>{
+              const next = {...paySettings, seasonalEvent: {...(paySettings.seasonalEvent||{}), emoji:e.target.value}};
+              savePaySettings(next);
+            }} style={{marginTop:6,marginBottom:10,width:80}}/>
+            <button
+              className="pill"
+              style={paySettings.seasonalEvent?.active ? {background:"var(--coral)",borderColor:"var(--coral)",color:"#fff",width:"100%"} : {width:"100%"}}
+              onClick={()=>{
+                const next = {...paySettings, seasonalEvent: {...(paySettings.seasonalEvent||{}), active: !paySettings.seasonalEvent?.active}};
+                savePaySettings(next);
+              }}
+            >
+              {paySettings.seasonalEvent?.active ? "✓ กำลังแสดงอยู่ (แตะเพื่อปิด)" : "แตะเพื่อเปิดแสดงป้ายนี้"}
+            </button>
+            <p style={{fontSize:11,color:"#9C8A7A",marginTop:8}}>
+              ป้ายจะขึ้นเหนือชื่อมาสคอตในหน้าลูกค้าทันทีที่เปิดใช้งาน ปิด-เปิดเองได้ตลอด ไม่ต้อง deploy ใหม่
             </p>
           </div>
         )}
