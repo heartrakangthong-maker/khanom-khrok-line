@@ -123,16 +123,12 @@ const DEFAULT_SETTINGS = {
     { keywords: ['หิว'], answer: 'แอดมินก็หิววว !! 🤩 กดสั่งกันเลยมั้ยยย' },
   ],
   lottery: [
-    { label: 'ลด 10% ครั้งหน้า', weight: 18 },
-    { label: 'ฟรีบ้าบิ่น 1 กล่อง', weight: 13 },
-    { label: 'ลด 5% ครั้งหน้า', weight: 22 },
-    { label: 'ลุ้นใหม่ครั้งหน้านะ', weight: 15 },
-    { label: 'ฟรีค่าส่งครั้งหน้า', weight: 12 },
-    { label: 'ลด 20% ครั้งหน้า', weight: 5 },
-    { label: 'อาหารพิเศษให้มาสคอต 1 ชิ้น', weight: 10, type: 'mascotFood', amount: 1 },
-    { label: 'อาหารพิเศษให้มาสคอต 2 ชิ้น', weight: 5, type: 'mascotFood', amount: 2 },
+    { label: 'ลด 5% ครั้งหน้า', weight: 5 },
+    { label: 'ลุ้นใหม่ครั้งหน้านะ', weight: 56 },
+    { label: 'อาหารพิเศษให้มาสคอต 1 ชิ้น', weight: 36, type: 'mascotFood', amount: 1 },
+    { label: 'อาหารพิเศษให้มาสคอต 2 ชิ้น', weight: 3, type: 'mascotFood', amount: 2 },
   ],
-  pointsPerFood: 3,
+  pointsPerFood: 1,
 };
 
 function pickWeighted(items) {
