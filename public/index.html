@@ -273,8 +273,25 @@ function MascotCard({userId}){
     : 100;
 
   return (
-    <div className="card" style={{marginBottom:12,textAlign:"center"}}>
+    <div className="card" style={{marginBottom:12,textAlign:"center",background:"linear-gradient(180deg,#FFFDF6,var(--cream-deep))",border:"1px solid #F0E2C4",borderRadius:26,padding:"20px 16px",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:-30,left:-30,width:110,height:110,borderRadius:"50%",background:"radial-gradient(circle,#E3A33533,transparent 70%)"}}/>
+      <div style={{position:"absolute",bottom:-40,right:-30,width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle,#527A5433,transparent 70%)"}}/>
       <div ref={stageRef} style={{position:"relative",width:200,height:225,margin:"0 auto",touchAction: dragging ? "none" : "auto"}}>
+        <div style={{
+          position:"absolute", top:8, left:12, width:176, height:176, borderRadius:"50%",
+          background:"radial-gradient(circle at 40% 35%, #ffffff 0%, var(--cream-deep) 70%, transparent 100%)",
+          boxShadow:"inset 0 0 0 2px rgba(255,255,255,.7), 0 6px 18px -8px rgba(58,34,51,.25)",
+        }}/>
+        {["8%,18%","82%,14%","12%,78%","86%,70%"].map((pos,i)=>{
+          const [left,top] = pos.split(",");
+          const emojis = ["✨","🌿","✨","🍃"];
+          return (
+            <div key={i} style={{
+              position:"absolute", top, left, fontSize: i%2===0?13:15, opacity:.85,
+              animation:`sparkle-float ${2.6+i*0.4}s ease-in-out ${i*0.3}s infinite`,
+            }}>{emojis[i]}</div>
+          );
+        })}
         <div style={{position:"absolute",top:0,left:35,width:130,height:130}}>
           <div style={{
             width:"100%",height:"100%",
@@ -385,37 +402,48 @@ function MascotCard({userId}){
         )}
       </div>
 
-      <p className="mitr" style={{margin:"2px 0 2px",fontSize:15,fontWeight:700}}>
-        {data.stageName}{data.isDirty && !bathing ? " · ตัวเลอะจัง 🫧" : ""}
-      </p>
-      <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 4px"}}>
+      <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,padding:"5px 14px",margin:"4px 0 6px",boxShadow:"0 3px 8px -4px rgba(58,34,51,.2)"}}>
+        <span style={{fontSize:14}}>🌿</span>
+        <p className="mitr" style={{margin:0,fontSize:14,fontWeight:700,color:"var(--plum)"}}>
+          {data.stageName}{data.isDirty && !bathing ? " · เลอะจัง 🫧" : ""}
+        </p>
+      </div>
+      <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 10px"}}>
         {data.nextThreshold ? `อาหารแล้ว ${data.foodGiven}/${data.nextThreshold} ชิ้น จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
       </p>
+      <div style={{height:10,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,overflow:"hidden",margin:"0 0 16px",boxShadow:"inset 0 1px 3px rgba(58,34,51,.12)"}}>
+        <div style={{height:"100%",width:`${progress}%`,background:"linear-gradient(90deg,#8FBE63,var(--leaf))",borderRadius:999,transition:"width .4s"}}/>
+      </div>
+
+      <div style={{background:"#fff",border:"1px solid #F0E2C4",borderRadius:18,padding:"14px 16px",marginBottom:10,boxShadow:"0 4px 12px -8px rgba(58,34,51,.2)"}}>
+        <div style={{fontSize:24,marginBottom:2}}>💎</div>
+        <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>แต้มของคุณ</p>
+        <p className="mono" style={{fontSize:22,fontWeight:800,color:"var(--coral)",margin:"2px 0 4px"}}>{data.availablePoints} แต้ม</p>
+        <p style={{fontSize:11,color:"#9C8A7A",margin:0}}>ทุกออเดอร์ที่เสร็จแล้วได้ 1 แต้ม (ไม่ว่ายอดเท่าไหร่) · เก็บไว้แลกของอื่นๆ ได้อีกในอนาคต เช่น เครื่องแต่งกายมาสคอต 👒</p>
+      </div>
+
+      <div style={{background:"#fff",border:"1px solid #F0E2C4",borderRadius:18,padding:"14px 16px",marginBottom:14,boxShadow:"0 4px 12px -8px rgba(58,34,51,.2)"}}>
+        <div style={{fontSize:26,marginBottom:2}}>🎁</div>
+        <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>อาหารในคลัง</p>
+        <p className="mono" style={{fontSize:22,fontWeight:800,color:"var(--leaf)",margin:"2px 0 4px"}}>{data.foodInventory} ชิ้น</p>
+        <p style={{fontSize:11,color:"#9C8A7A",margin:0}}>ใช้ {data.pointsPerFood} แต้ม แลกอาหารมาสคอตได้ 1 ชิ้น</p>
+      </div>
       <p style={{fontSize:11,color:"#9C8A7A",margin:"0 0 12px"}}>
         {data.canFeed ? "แตะกล่องของขวัญ 🎁 แล้วลากอาหารไปป้อนน้องได้เลย" : "ยังไม่มีอาหารในคลัง แลกแต้มเป็นอาหารก่อนนะครับ"}
       </p>
-      <div style={{height:8,background:"var(--cream-deep)",borderRadius:999,overflow:"hidden",margin:"0 0 14px"}}>
-        <div style={{height:"100%",width:`${progress}%`,background:"var(--leaf)",borderRadius:999,transition:"width .4s"}}/>
-      </div>
-
-      <div className="card" style={{background:"var(--cream)",boxShadow:"none",padding:12,marginBottom:12}}>
-        <p style={{fontSize:13,margin:0}}>แต้มของคุณ: <b className="mono" style={{color:"var(--coral)"}}>{data.availablePoints}</b> แต้ม</p>
-        <p style={{fontSize:11,color:"#9C8A7A",margin:"2px 0 0"}}>ทุก 100฿ ในบิลที่ทำเสร็จแล้วได้ 1 แต้ม · ใช้ {data.pointsPerFood} แต้มแลกอาหาร 1 ชิ้น</p>
-        <p style={{fontSize:13,margin:"8px 0 0"}}>อาหารในคลัง: <b className="mono" style={{color:"var(--leaf)"}}>{data.foodInventory}</b> ชิ้น</p>
-      </div>
 
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {data.nextThreshold && (
-          <button className="btn-teal" style={{background: data.canRedeem ? "var(--teal)" : "#C9BBA5"}} disabled={redeeming || !data.canRedeem} onClick={redeem}>
+          <button className="btn-teal" style={{background: data.canRedeem ? "var(--teal)" : "#C9BBA5",borderRadius:999}} disabled={redeeming || !data.canRedeem} onClick={redeem}>
             💰 แลกแต้มเป็นอาหาร (ใช้ {data.pointsPerFood} แต้ม)
           </button>
         )}
         {data.isDirty && (
-          <button className="btn-teal" style={{background: flash==="clean" ? "var(--leaf)" : "#3D7FBF"}} disabled={bathing} onClick={openBathPopup}>
+          <button className="btn-teal" style={{background: flash==="clean" ? "var(--leaf)" : "#3D7FBF",borderRadius:999,boxShadow:"0 4px 10px -4px rgba(61,127,191,.6)"}} disabled={bathing} onClick={openBathPopup}>
             {bathing ? "กำลังอาบน้ำ... 🫧" : flash==="clean" ? "สะอาดแล้ว! ✨" : "🛁 อาบน้ำให้มาสคอต"}
           </button>
         )}
-        <button className="pill" style={{width:"100%"}} disabled={patting} onClick={patMascot}>
+        <button className="pill" style={{width:"100%",borderRadius:999}} disabled={patting} onClick={patMascot}>
           🤚 ลูบหัวมาสคอต
         </button>
       </div>
@@ -423,6 +451,7 @@ function MascotCard({userId}){
       {showBathPopup && <BathPopup stage={data.stage} onClose={finishBath}/>}
 
       <style>{`
+        @keyframes sparkle-float { 0%,100%{ transform: translateY(0) rotate(0deg); opacity:.85;} 50%{ transform: translateY(-7px) rotate(12deg); opacity:1;} }
         @keyframes mascot-bob { 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(-6px) rotate(-2deg);} }
         @keyframes heart-rise { 0%{ transform: translateY(0) scale(.5); opacity:0;} 20%{ opacity:1;} 100%{ transform: translateY(-46px) scale(1.1); opacity:0;} }
         @keyframes mouth-pop { 0%{ transform: translateX(-50%) scale(.5); opacity:0;} 100%{ transform: translateX(-50%) scale(1); opacity:1;} }
@@ -907,7 +936,7 @@ function AdminPanel({onClose}){
   const [orders,setOrders] = useState([]);
   const [tab,setTab] = useState("menu");
   const [error,setError] = useState("");
-  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:"",faqs:[],lottery:[],pointsPerFood:3});
+  const [paySettings,setPaySettings] = useState({qrImage:"",accountName:"",faqs:[],lottery:[],pointsPerFood:1});
   const [showAdminBathTest,setShowAdminBathTest] = useState(false);
 
   const unlock = async () => {
@@ -1063,7 +1092,10 @@ function AdminPanel({onClose}){
               savePaySettings(next);
             }} style={{marginTop:6,marginBottom:10}}/>
             <p style={{fontSize:12,color:"#7A6A5C",margin:0}}>
-              ลูกค้าได้ 1 แต้มทุกๆ 100฿ ในบิลที่แอดมินกดสถานะ "เสร็จแล้ว" แล้วเท่านั้น (ตรวจสลิปก่อนกดเสมอ) ใช้ <b>{paySettings.pointsPerFood||1}</b> แต้ม แลกอาหารมาสคอตได้ 1 ชิ้น
+              ลูกค้าได้ <b>1 แต้ม ทุกครั้งที่ออเดอร์เสร็จแล้ว</b> (แอดมินกดสถานะ "เสร็จแล้ว" เท่านั้น ตรวจสลิปก่อนกดเสมอ) ไม่ว่ายอดออเดอร์จะเท่าไหร่ก็ตาม ใช้ <b>{paySettings.pointsPerFood||1}</b> แต้ม แลกอาหารมาสคอตได้ 1 ชิ้น
+            </p>
+            <p style={{fontSize:11,color:"#9C8A7A",marginTop:8}}>
+              เก็บแต้มไว้ก่อนได้ครับ — ในอนาคตจะเพิ่มให้ใช้แต้มแลกเครื่องแต่งกายให้มาสคอตได้ด้วย
             </p>
             <p style={{fontSize:11,color:"#9C8A7A",marginTop:8}}>
               ด่านการเติบโต (คงที่ ไม่ต้องตั้ง): ร่าง 1→2 ใช้ 5 ชิ้น · 2→3 ใช้ 5 ชิ้น · 3→4 ใช้ 10 ชิ้น · 4→5 ใช้ 20 ชิ้น
