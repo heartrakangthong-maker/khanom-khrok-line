@@ -127,7 +127,25 @@ function useCuteSound(){
       osc2.start(t1); osc2.stop(t1 + 0.22);
     } catch (e) { /* เบราว์เซอร์บางตัวอาจเล่นเสียงไม่ได้ ข้ามไปเงียบๆ */ }
   };
-  return { playCute };
+  const playPat = () => {
+    try {
+      const ctx = getCtx();
+      const notes = [740, 990];
+      notes.forEach((freq, i) => {
+        const t0 = ctx.currentTime + i * 0.1;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, t0);
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t0); osc.stop(t0 + 0.18);
+      });
+    } catch (e) { /* เบราว์เซอร์บางตัวอาจเล่นเสียงไม่ได้ ข้ามไปเงียบๆ */ }
+  };
+  return { playCute, playPat };
 }
 
 /* ====== Pop-up อาบน้ำมาสคอต — โชว์ภาพอาบน้ำจริงของแต่ละร่าง พร้อมเสียงน่ารักๆ ====== */
@@ -173,6 +191,7 @@ function MascotCard({userId}){
   const [showDragHint,setShowDragHint] = useState(false);
   const stageRef = React.useRef(null);
   const foodPosRef = React.useRef(null);
+  const { playPat } = useCuteSound();
   useEffect(()=>{ foodPosRef.current = foodPos; },[foodPos]);
 
   const MOUTH = {x:100, y:80};
@@ -216,6 +235,7 @@ function MascotCard({userId}){
   const patMascot = () => {
     if (patting) return;
     setPatting(true);
+    playPat();
     setTimeout(()=>setPatting(false), 900);
   };
 
@@ -403,6 +423,10 @@ function MascotCard({userId}){
         )}
       </div>
 
+      <button className="pill" style={{width:"auto",padding:"6px 18px",borderRadius:999,margin:"2px 0 8px",fontSize:13}} disabled={patting} onClick={patMascot}>
+        🤚 ลูบหัวมาสคอต
+      </button>
+
       <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,padding:"5px 14px",margin:"4px 0 6px",boxShadow:"0 3px 8px -4px rgba(58,34,51,.2)"}}>
         <span style={{fontSize:14}}>🌿</span>
         <p className="mitr" style={{margin:0,fontSize:14,fontWeight:700,color:"var(--plum)"}}>
@@ -443,9 +467,6 @@ function MascotCard({userId}){
             {bathing ? "กำลังอาบน้ำ... 🫧" : flash==="clean" ? "สะอาดแล้ว! ✨" : "🛁 อาบน้ำให้มาสคอต"}
           </button>
         )}
-        <button className="pill" style={{width:"100%",borderRadius:999}} disabled={patting} onClick={patMascot}>
-          🤚 ลูบหัวมาสคอต
-        </button>
         <button className="pill" style={{width:"100%",borderRadius:999}} onClick={()=>setShowShopPopup(true)}>
           🛍 ร้านค้า
         </button>
