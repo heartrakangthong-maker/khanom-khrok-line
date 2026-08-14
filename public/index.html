@@ -297,6 +297,12 @@ function MascotCard({userId}){
     <div className="card" style={{marginBottom:12,textAlign:"center",background:"linear-gradient(180deg,#FFFDF6,var(--cream-deep))",border:"1px solid #F0E2C4",borderRadius:26,padding:"20px 16px",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:-30,left:-30,width:110,height:110,borderRadius:"50%",background:"radial-gradient(circle,#E3A33533,transparent 70%)"}}/>
       <div style={{position:"absolute",bottom:-40,right:-30,width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle,#527A5433,transparent 70%)"}}/>
+      <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,padding:"5px 14px",margin:"0 0 12px",position:"relative",boxShadow:"0 3px 8px -4px rgba(58,34,51,.2)"}}>
+        <span style={{fontSize:14}}>🌿</span>
+        <p className="mitr" style={{margin:0,fontSize:14,fontWeight:700,color:"var(--plum)"}}>
+          {data.stageName}{data.isDirty && !bathing ? " · เลอะจัง 🫧" : ""}
+        </p>
+      </div>
       <div ref={stageRef} style={{position:"relative",width:200,height:225,margin:"0 auto",touchAction: dragging ? "none" : "auto"}}>
         <div style={{
           position:"absolute", top:8, left:12, width:176, height:176, borderRadius:"50%",
@@ -427,12 +433,6 @@ function MascotCard({userId}){
         🤚 ลูบหัวมาสคอต
       </button>
 
-      <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#fff",border:"1px solid #F0E2C4",borderRadius:999,padding:"5px 14px",margin:"4px 0 6px",boxShadow:"0 3px 8px -4px rgba(58,34,51,.2)"}}>
-        <span style={{fontSize:14}}>🌿</span>
-        <p className="mitr" style={{margin:0,fontSize:14,fontWeight:700,color:"var(--plum)"}}>
-          {data.stageName}{data.isDirty && !bathing ? " · เลอะจัง 🫧" : ""}
-        </p>
-      </div>
       <p style={{fontSize:12,color:"#7A6A5C",margin:"0 0 10px"}}>
         {data.nextThreshold ? `อาหารแล้ว ${data.foodGiven}/${data.nextThreshold} ชิ้น จะโตขึ้นอีกขั้น!` : "โตเต็มขั้นแล้ว ขอบคุณที่อุดหนุนกันมาตลอดนะครับ 🙏"}
       </p>
